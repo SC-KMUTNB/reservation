@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
     const buffer = await workbook.xlsx.writeBuffer();
 
     const timestamp = new Date().toISOString().slice(0, 10);
-    const fileName = `KMUTNB_Parliament_Reservation_Report_${timestamp}.xlsx`;
+    const fileName = `KMUTNB_Council_Reservation_Report_${timestamp}.xlsx`;
 
     return new NextResponse(buffer, {
       status: 200,

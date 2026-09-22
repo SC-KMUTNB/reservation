@@ -68,7 +68,7 @@ export default function HomePage() {
                 {settings.site_title || 'สภานักศึกษา มจพ.'}
               </h1>
               <p className="text-[11px] text-orange-100 font-medium tracking-wide">
-                {settings.site_subtitle || 'Student Parliament KMUTNB'}
+                {settings.site_subtitle || 'Student Council KMUTNB'}
               </p>
             </div>
           </Link>
@@ -307,7 +307,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <span className="text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200">
-                  @kmutnb_parliament
+                  @kmutnb_council
                 </span>
               </div>
 
@@ -338,7 +338,7 @@ export default function HomePage() {
                   </div>
                   <div className="truncate">
                     <div className="font-bold text-xs text-slate-800 group-hover:text-pink-600 transition">Instagram</div>
-                    <div className="text-[11px] text-slate-500 truncate">{settings.social_instagram_title || '@kmutnb_parliament'}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{settings.social_instagram_title || '@kmutnb_council'}</div>
                   </div>
                 </a>
 
@@ -401,7 +401,7 @@ export default function HomePage() {
               อาคารกิจกรรมนักศึกษา 1518 ถนนประชาราษฎร์ 1 แขวงวงศ์สว่าง เขตบางซื่อ กรุงเทพมหานคร 10800
             </p>
             <p className="text-slate-500 text-[11px] pt-1">
-              อีเมล: <span className="text-slate-300">{settings.contact_email || 'parliament@kmutnb.ac.th'}</span> • โทร: <span className="text-slate-300">{settings.contact_phone || '02-555-2000 ต่อ 1135'}</span>
+              อีเมล: <span className="text-slate-300">{settings.contact_email || 'council@kmutnb.ac.th'}</span> • โทร: <span className="text-slate-300">{settings.contact_phone || '02-555-2000 ต่อ 1135'}</span>
             </p>
           </div>
           <div className="flex items-center space-x-5 text-slate-300 text-xs font-medium">

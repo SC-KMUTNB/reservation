@@ -34,18 +34,18 @@ async function main() {
 
   const defaultSettings = [
     { key: 'site_title', value: 'สภานักศึกษา มจพ.', description: 'ชื่อระบบ' },
-    { key: 'site_subtitle', value: 'Student Parliament KMUTNB', description: 'คำบรรยายย่อย' },
+    { key: 'site_subtitle', value: 'Student Council KMUTNB', description: 'คำบรรยายย่อย' },
     { key: 'hero_title', value: 'ยินดีต้อนรับสู่เว็บไซต์สภานักศึกษา มจพ.', description: 'หัวข้อหน้าแรก' },
     { key: 'hero_description', value: 'ศูนย์รวมข้อมูลข่าวสาร การจองห้องประชุม และช่องทางการติดต่อสื่อสารเพื่อชาว มจพ.', description: 'คำอธิบายหน้าแรก' },
     { key: 'social_facebook', value: 'https://www.facebook.com', description: 'ลิงก์ Facebook' },
     { key: 'social_facebook_title', value: 'สภานักศึกษา มจพ.', description: 'ชื่อแสดง Facebook' },
     { key: 'social_instagram', value: 'https://www.instagram.com', description: 'ลิงก์ Instagram' },
-    { key: 'social_instagram_title', value: '@kmutnb_parliament', description: 'ชื่อแสดง Instagram' },
+    { key: 'social_instagram_title', value: '@kmutnb_council', description: 'ชื่อแสดง Instagram' },
     { key: 'social_tiktok', value: 'https://www.tiktok.com', description: 'ลิงก์ TikTok' },
     { key: 'social_tiktok_title', value: 'สภานักศึกษา มจพ.', description: 'ชื่อแสดง TikTok' },
     { key: 'complaint_url', value: 'https://forms.gle/your-google-form-link', description: 'ลิงก์ Google Form รับเรื่องร้องเรียน' },
     { key: 'rules_content', value: '1. ห้ามนำอาหารและเครื่องดื่ม (ยกเว้นน้ำเปล่า) เข้ามารับประทานในห้องประชุมเด็ดขาด\n2. ช่วยกันรักษาความสะอาด ปิดไฟ และเครื่องปรับอากาศทุกครั้งหลังใช้งานเสร็จ\n⚠️ คำเตือน: หากทำผิดกฎระเบียบ ท่านจะไม่สามารถจองห้องประชุมได้อีกเป็นเวลา 2 เดือนเต็ม', description: 'กฎระเบียบการใช้ห้องประชุม' },
-    { key: 'contact_email', value: 'parliament@kmutnb.ac.th', description: 'อีเมลติดต่อ' },
+    { key: 'contact_email', value: 'council@kmutnb.ac.th', description: 'อีเมลติดต่อ' },
     { key: 'contact_phone', value: '02-555-2000 ต่อ 1133', description: 'เบอร์ติดต่อ' },
   ];
 

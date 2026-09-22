@@ -287,7 +287,7 @@ export default function BookingPage() {
                 {settings.site_title || 'สภานักศึกษา มจพ.'}
               </h1>
               <p className="text-[11px] text-orange-100 font-medium tracking-wide">
-                {settings.site_subtitle || 'Student Parliament KMUTNB'}
+                {settings.site_subtitle || 'Student Council KMUTNB'}
               </p>
             </div>
           </Link>
@@ -856,7 +856,7 @@ export default function BookingPage() {
           <div className="text-center md:text-left">
             <p className="font-semibold text-slate-200">สภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.)</p>
             <p className="text-slate-500 mt-1">
-              อีเมล: {settings.contact_email || 'parliament@kmutnb.ac.th'} | โทร: {settings.contact_phone || '02-555-2000 ต่อ 1135'}
+              อีเมล: {settings.contact_email || 'council@kmutnb.ac.th'} | โทร: {settings.contact_phone || '02-555-2000 ต่อ 1135'}
             </p>
           </div>
           <div className="flex items-center space-x-4">

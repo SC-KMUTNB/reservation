@@ -10,7 +10,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'สภานักศึกษา มจพ. - พอร์ทัลและระบบจองห้องประชุม',
   description: 'ระบบจองห้องประชุมและศูนย์บริการนักศึกษา สภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.)',
-  keywords: ['มจพ.', 'สภานักศึกษา', 'จองห้องประชุม', 'KMUTNB', 'Student Parliament'],
+  keywords: ['มจพ.', 'สภานักศึกษา', 'จองห้องประชุม', 'KMUTNB', 'Student Council'],
 };
 
 export default function RootLayout({

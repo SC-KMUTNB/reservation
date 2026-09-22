@@ -14,7 +14,9 @@ import {
   Mail,
   User,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 interface AdminUserItem {
@@ -105,11 +107,11 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch (e) {
       console.error(e);
-      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
+  const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     setErrorMsg(null);
@@ -121,8 +123,9 @@ export default function AdminUsersPage() {
         role: editFormData.role,
         isActive: editFormData.isActive,
       };
-      if (editFormData.password) {
-        payload.password = editFormData.password;
+
+      if (editFormData.password.trim()) {
+        payload.password = editFormData.password.trim();
       }
 
       const res = await fetch(`/api/users/${selectedUser.id}`, {
@@ -134,42 +137,43 @@ export default function AdminUsersPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(data.error || 'ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้');
+        setErrorMsg(data.error || 'ไม่สามารถแก้ไขข้อมูลผู้ดูแลระบบได้');
         return;
       }
 
-      setSuccessMsg(`อัปเดตข้อมูล ${data.user.fullName} เรียบร้อยแล้ว`);
+      setSuccessMsg(`อัปเดตข้อมูลของ ${data.user.fullName} เรียบร้อยแล้ว`);
       setIsEditModalOpen(false);
       setSelectedUser(null);
       fetchUsers();
     } catch (e) {
       console.error(e);
-      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
-  const handleDeleteUser = async (user: AdminUserItem) => {
-    if (!confirm(`คุณต้องการลบบัญชีผู้ใช้ ${user.fullName} (${user.email}) ใช่หรือไม่?`)) return;
+  const handleDeleteUser = async (id: string, name: string) => {
+    if (!confirm(`คุณต้องการลบผู้ดูแลระบบ ${name} ใช่หรือไม่?`)) return;
 
     setErrorMsg(null);
     setSuccessMsg(null);
+
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
+      const res = await fetch(`/api/users/${id}`, {
         method: 'DELETE',
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(data.error || 'ไม่สามารถลบบัญชีผู้ใช้ได้');
+        setErrorMsg(data.error || 'ไม่สามารถลบผู้ดูแลระบบได้');
         return;
       }
 
-      setSuccessMsg('ลบบัญชีผู้ดูแลระบบเรียบร้อยแล้ว');
+      setSuccessMsg(`ลบผู้ดูแลระบบเรียบร้อยแล้ว`);
       fetchUsers();
     } catch (e) {
       console.error(e);
-      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
@@ -186,87 +190,99 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">จัดการรายชื่อผู้ดูแลระบบ (Multi-User Admins)</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            เพิ่ม แก้ไข และกำหนดสิทธิ์การเข้าถึงระบบระหว่าง Super Admin และ เจ้าหน้าที่ทั่วไป
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            จัดการบัญชีผู้ดูแลระบบ
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 font-light">
+            กำหนดสิทธิ์การเข้าถึง และจัดการบัญชีเจ้าหน้าที่สภานักศึกษา มจพ.
           </p>
         </div>
 
         <button
-          onClick={() => {
-            setErrorMsg(null);
-            setIsAddModalOpen(true);
-          }}
-          className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          onClick={() => setIsAddModalOpen(true)}
+          className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-warm-xs transition flex items-center gap-2 active-press cursor-pointer self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4" /> เพิ่มผู้ดูแลระบบใหม่
         </button>
       </div>
 
+      {/* Notifications */}
       {errorMsg && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3.5 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-4 rounded-2xl flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+            <span className="font-medium">{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg(null)} className="text-rose-600 font-bold p-1">
+          <button onClick={() => setErrorMsg(null)} className="text-rose-600 font-bold p-1 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3.5 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{successMsg}</span>
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-4 rounded-2xl flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-medium">{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-600 font-bold p-1">
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-600 font-bold p-1 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Users Table Card */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-warm p-5 md:p-6 space-y-4">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                <th className="p-3.5 font-semibold">ชื่อ-นามสกุล</th>
-                <th className="p-3.5 font-semibold">อีเมลล็อกอิน</th>
-                <th className="p-3.5 font-semibold">ระดับสิทธิ์ (Role)</th>
-                <th className="p-3.5 font-semibold">สถานะบัญชี</th>
-                <th className="p-3.5 font-semibold">ประวัติการอนุมัติ</th>
-                <th className="p-3.5 font-semibold text-right">จัดการ</th>
+              <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
+                <th className="p-3.5">ผู้ดูแลระบบ</th>
+                <th className="p-3.5">อีเมลล็อกอิน</th>
+                <th className="p-3.5">ระดับสิทธิ์ (Role)</th>
+                <th className="p-3.5">สถานะบัญชี</th>
+                <th className="p-3.5">สถิติการอนุมัติ</th>
+                <th className="p-3.5 text-right">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-400">
-                    กำลังโหลดรายชื่อผู้ดูแลระบบ...
+                    กำลังโหลดข้อมูลผู้ใช้งาน...
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-400">
+                    ไม่พบบัญชีผู้ใช้งานในระบบ
                   </td>
                 </tr>
               ) : (
                 users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 transition">
+                  <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="p-3.5">
-                      <div className="font-bold text-slate-800">{u.fullName}</div>
-                      <div className="text-[10px] text-slate-400">
-                        สร้างเมื่อ {u.createdAt.slice(0, 10)}
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-mono text-[11px]">
+                          {u.fullName.slice(0, 1)}
+                        </div>
+                        <span>{u.fullName}</span>
                       </div>
                     </td>
 
-                    <td className="p-3.5 text-slate-600 font-mono text-[11px]">{u.email}</td>
+                    <td className="p-3.5 font-mono text-slate-600 text-[11px]">
+                      {u.email}
+                    </td>
 
                     <td className="p-3.5">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
                           u.role === 'SUPER_ADMIN'
-                            ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                            ? 'bg-orange-50 text-orange-800 border border-orange-300'
+                            : 'bg-blue-50 text-blue-800 border border-blue-300'
                         }`}
                       >
                         <Shield className="w-3 h-3" />
@@ -276,35 +292,36 @@ export default function AdminUsersPage() {
 
                     <td className="p-3.5">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           u.isActive
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-rose-100 text-rose-700'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            : 'bg-slate-100 text-slate-500 border border-slate-200'
                         }`}
                       >
-                        {u.isActive ? 'เปิดใช้งาน' : 'ระงับบัญชี'}
+                        {u.isActive ? 'เปิดใช้งาน' : 'ระงับการใช้งาน'}
                       </span>
                     </td>
 
-                    <td className="p-3.5 text-slate-600 font-medium">
-                      {u._count ? `${u._count.approvedBookings} รายการ` : '-'}
+                    <td className="p-3.5 tabular-nums font-mono text-slate-600">
+                      {u._count?.approvedBookings ?? 0} ครั้ง
                     </td>
 
-                    <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                      <button
-                        onClick={() => openEditModal(u)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer"
-                      >
-                        แก้ไข
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteUser(u)}
-                        className="bg-rose-50 hover:bg-rose-100 text-rose-600 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer"
-                        title="ลบบัญชี"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td className="p-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(u)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition active-press flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 className="w-3 h-3" /> แก้ไข
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.fullName)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          title="ลบบัญชีนี้"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -314,14 +331,18 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {/* Add User Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800">เพิ่มผู้ดูแลระบบใหม่</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">เพิ่มผู้ดูแลระบบใหม่</h3>
+                <p className="text-xs text-slate-500 mt-0.5">กรอกข้อมูลบัญชีเพื่อเปิดสิทธิ์การเข้าใช้งาน</p>
+              </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -335,25 +356,25 @@ export default function AdminUsersPage() {
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="เช่น นายเอกชัย ภักดี"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  placeholder="เช่น นายกฤตภาส เจริญสุข"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">อีเมลสำหรับเข้าสู่ระบบ</label>
+                <label className="block font-semibold text-slate-700 mb-1">อีเมลผู้ใช้งาน</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="staff@kmutnb.ac.th"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  placeholder="admin@kmutnb.ac.th"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (ขั้นต่ำ 6 ตัวอักษร)</label>
+                <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
                 <input
                   type="password"
                   required
@@ -361,7 +382,7 @@ export default function AdminUsersPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="••••••••"
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
                 />
               </div>
 
@@ -370,14 +391,14 @@ export default function AdminUsersPage() {
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
                 >
-                  <option value="ADMIN">Admin (เจ้าหน้าที่: ตรวจสอบ/อนุมัติ/ส่งออก Excel)</option>
-                  <option value="SUPER_ADMIN">Super Admin (สิทธิ์สูงสุด: จัดการผู้ใช้ & ตั้งค่าระบบ)</option>
+                  <option value="ADMIN">Admin (เจ้าหน้าที่ - ตรวจสอบและอนุมัติการจอง)</option>
+                  <option value="SUPER_ADMIN">Super Admin (สิทธิ์สูงสุด - จัดการผู้ใช้และตั้งค่า)</option>
                 </select>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -387,9 +408,9 @@ export default function AdminUsersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition cursor-pointer shadow-sm"
+                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer"
                 >
-                  บันทึกผู้ใช้ใหม่
+                  สร้างบัญชีผู้ใช้
                 </button>
               </div>
             </form>
@@ -397,20 +418,24 @@ export default function AdminUsersPage() {
         </div>
       )}
 
+      {/* Edit User Modal */}
       {isEditModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800">แก้ไขข้อมูลผู้ดูแลระบบ</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">แก้ไขข้อมูลผู้ดูแลระบบ</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedUser.email}</p>
+              </div>
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateUser} className="space-y-4 text-xs">
+            <form onSubmit={handleEditUser} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
                 <input
@@ -418,34 +443,8 @@ export default function AdminUsersPage() {
                   required
                   value={editFormData.fullName}
                   onChange={(e) => setEditFormData({ ...editFormData, fullName: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
                 />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
-                <select
-                  value={editFormData.role}
-                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
-                >
-                  <option value="ADMIN">Admin (เจ้าหน้าที่ทั่วไป)</option>
-                  <option value="SUPER_ADMIN">Super Admin (ผู้ดูแลระบบสูงสุด)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">สถานะบัญชี</label>
-                <select
-                  value={editFormData.isActive ? 'true' : 'false'}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, isActive: e.target.value === 'true' })
-                  }
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
-                >
-                  <option value="true">เปิดใช้งาน (Active)</option>
-                  <option value="false">ระงับบัญชี (Suspended)</option>
-                </select>
               </div>
 
               <div>
@@ -456,12 +455,36 @@ export default function AdminUsersPage() {
                   type="password"
                   value={editFormData.password}
                   onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
-                  placeholder="รหัสผ่านใหม่..."
-                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  placeholder="เว้นว่างไว้เพื่อคงรหัสผ่านเดิม"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
+                <select
+                  value={editFormData.role}
+                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
+                >
+                  <option value="ADMIN">Admin (เจ้าหน้าที่ - ตรวจสอบและอนุมัติการจอง)</option>
+                  <option value="SUPER_ADMIN">Super Admin (สิทธิ์สูงสุด - จัดการผู้ใช้และตั้งค่า)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">สถานะการใช้งาน</label>
+                <select
+                  value={editFormData.isActive ? 'ACTIVE' : 'INACTIVE'}
+                  onChange={(e) => setEditFormData({ ...editFormData, isActive: e.target.value === 'ACTIVE' })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
+                >
+                  <option value="ACTIVE">เปิดใช้งาน (ปกติ)</option>
+                  <option value="INACTIVE">ระงับการใช้งาน (ห้ามเข้าสู่ระบบ)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
@@ -471,7 +494,7 @@ export default function AdminUsersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition cursor-pointer shadow-sm"
+                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer"
                 >
                   บันทึกการแก้ไข
                 </button>

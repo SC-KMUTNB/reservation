@@ -1,4 +1,4 @@
-# KMUTNB Student Parliament Meeting Room Reservation System
+# KMUTNB Student Council Meeting Room Reservation System
 (ระบบจองห้องประชุมสภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ)
 
 A full-stack meeting room reservation web application recreated from the original HTML mockup, built with **Next.js 14+ (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, and **PostgreSQL**, powered by **Bun** as runtime and package manager, ready for instant deployment on **Vercel**.

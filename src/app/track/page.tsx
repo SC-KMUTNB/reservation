@@ -98,7 +98,7 @@ function TrackContent() {
                 สภานักศึกษา มจพ.
               </h1>
               <p className="text-[11px] text-orange-100 font-medium tracking-wide">
-                Student Parliament KMUTNB
+                Student Council KMUTNB
               </p>
             </div>
           </Link>

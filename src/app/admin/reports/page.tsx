@@ -10,7 +10,10 @@ import {
   Clock,
   ShieldCheck,
   FileCheck,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  Table,
+  Layers
 } from 'lucide-react';
 
 export default function AdminReportsPage() {
@@ -18,6 +21,7 @@ export default function AdminReportsPage() {
   const [endDate, setEndDate] = useState('');
   const [status, setStatus] = useState('ALL');
   const [isExporting, setIsExporting] = useState(false);
+  const [activePreset, setActivePreset] = useState<number | null>(0);
 
   useEffect(() => {
     const today = new Date();
@@ -29,6 +33,7 @@ export default function AdminReportsPage() {
   }, []);
 
   const setMonthRange = (offset: number) => {
+    setActivePreset(offset);
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
     const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
@@ -53,159 +58,155 @@ export default function AdminReportsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page Title */}
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">ศูนย์ส่งออกรายงานสำหรับผู้บริหารมหาวิทยาลัย</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          ส่งออกไฟล์ Excel (.xlsx) สองชีต เพื่อใช้เป็นหลักฐานการตรวจสอบ (Audit Trail) และสถิติการใช้งานห้องประชุม
+        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          ศูนย์ส่งออกรายงานสำหรับผู้บริหาร
+        </h2>
+        <p className="text-xs text-slate-500 mt-1 font-light">
+          ส่งออกไฟล์ Microsoft Excel (.xlsx) สองแผ่นงานเพื่อใช้ประกอบการรายงานผลและตรวจสอบความโปร่งใส
         </p>
       </div>
 
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
+      {/* Filter & Export Card */}
+      <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/90 shadow-warm space-y-6">
         <div>
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-            ตัวเลือกช่วงเวลาที่ต้องการส่งออก
+          <div className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
+            1. เลือกช่วงเวลาที่ต้องการสรุปข้อมูล
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               type="button"
               onClick={() => setMonthRange(0)}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition active-press cursor-pointer ${
+                activePreset === 0
+                  ? 'bg-orange-600 text-white shadow-warm-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
               เดือนปัจจุบัน
             </button>
             <button
               type="button"
               onClick={() => setMonthRange(-1)}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition active-press cursor-pointer ${
+                activePreset === -1
+                  ? 'bg-orange-600 text-white shadow-warm-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
               เดือนที่แล้ว
             </button>
             <button
               type="button"
               onClick={() => {
+                setActivePreset(null);
                 setStartDate('');
                 setEndDate('');
               }}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition active-press cursor-pointer ${
+                activePreset === null
+                  ? 'bg-orange-600 text-white shadow-warm-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
               ทั้งหมด (ไม่จำกัดช่วงเวลา)
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">ตั้งแต่วันที่</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ตั้งแต่วันที่</label>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setActivePreset(null);
+                }}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono tabular-nums"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">ถึงวันที่</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ถึงวันที่</label>
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setActivePreset(null);
+                }}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono tabular-nums"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">สถานะคำขอ</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">สถานะคำขอ</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-medium"
               >
-                <option value="ALL">ทั้งหมดทุกสถานะ</option>
-                <option value="APPROVED">เฉพาะที่อนุมัติแล้ว (Approved)</option>
-                <option value="PENDING">เฉพาะที่รออนุมัติ (Pending)</option>
-                <option value="REJECTED">เฉพาะที่ถูกปฏิเสธ (Rejected)</option>
+                <option value="ALL">ทุกสถานะ (อนุมัติ, รออนุมัติ, ปฏิเสธ)</option>
+                <option value="APPROVED">เฉพาะที่ได้รับการอนุมัติ (APPROVED)</option>
+                <option value="PENDING">เฉพาะที่รออนุมัติ (PENDING)</option>
+                <option value="REJECTED">เฉพาะที่ถูกปฏิเสธ (REJECTED)</option>
               </select>
             </div>
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-xs text-slate-500 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>ไฟล์ Excel ถูกจัดรูปแบบเป็นทางการและแนบประวัติการกดอนุมัติของเจ้าหน้าที่ครบถ้วน</span>
+        {/* Excel Sheets Preview Bento */}
+        <div>
+          <div className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
+            2. ข้อมูลที่จะถูกสร้างในไฟล์ Excel (.xlsx)
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl flex items-start gap-3.5">
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
+                <Table className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <span>ชีต 1: รายการจองห้องประชุม (Bookings)</span>
+                </div>
+                <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
+                  รหัสจอง, วันที่, เวลาเริ่มต้น-สิ้นสุด, ชื่อผู้จอง, รหัสนักศึกษา, คณะ/สังกัด, วัตถุประสงค์, สถานะ, ผู้อนุมัติ, และเหตุผลการปฏิเสธ
+                </p>
+              </div>
+            </div>
 
+            <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl flex items-start gap-3.5">
+              <div className="w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <span>ชีต 2: บันทึกการตรวจสอบ (Audit Trail)</span>
+                </div>
+                <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
+                  ประวัติการเปลี่ยนแปลงสถานะ, เวลาทำรายการ (Timestamp), เจ้าหน้าที่ผู้ดำเนินการ, IP Address, และรายละเอียดคำขอ
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Download Button */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="text-xs text-slate-500 font-medium">
+            รูปแบบไฟล์: <span className="font-mono text-slate-700 font-bold">KMUTNB_Council_Reservation_Report_YYYY-MM-DD.xlsx</span>
+          </div>
           <button
             type="button"
             disabled={isExporting}
             onClick={handleDownload}
-            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-2xl text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-7 py-3 rounded-2xl text-xs shadow-warm hover:shadow-warm-lg transition-all duration-200 flex items-center justify-center gap-2 active-press cursor-pointer disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
-            {isExporting ? 'กำลังสร้างไฟล์ Excel...' : 'ดาวน์โหลดรายงาน Excel สำหรับผู้บริหาร (.xlsx)'}
+            <span>{isExporting ? 'กำลังเตรียมไฟล์ Excel...' : 'ดาวน์โหลดรายงาน Excel ทันที'}</span>
           </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center font-bold">
-              1
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-slate-800">ชีตที่ 1: รายงานการจองห้องประชุม</h4>
-              <p className="text-[11px] text-slate-500">ข้อมูลสรุปการใช้ห้องประชุมตามวันและเวลา</p>
-            </div>
-          </div>
-          <ul className="text-xs text-slate-600 space-y-2 pt-2 border-t border-slate-100">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>รหัสการจอง (Booking Code) และวันที่ใช้งาน</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>ชื่อ-นามสกุล, รหัสนักศึกษา, คณะ/หน่วยงาน, เบอร์โทร และอีเมล</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>วัตถุประสงค์ในการขอใช้ห้อง และสถานะการพิจารณา</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>ชื่อแอดมินผู้อนุมัติ/ปฏิเสธ พร้อมวันเวลาที่บันทึกคำสั่ง</span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-slate-100 text-slate-700 rounded-2xl flex items-center justify-center font-bold">
-              2
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-slate-800">ชีตที่ 2: บันทึกการตรวจสอบ (Audit Trail)</h4>
-              <p className="text-[11px] text-slate-500">หลักฐานลำดับเหตุการณ์ความโปร่งใสของระบบ</p>
-            </div>
-          </div>
-          <ul className="text-xs text-slate-600 space-y-2 pt-2 border-t border-slate-100">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-              <span>วันเวลาที่เกิดเหตุการณ์อย่างละเอียด (Timestamp)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-              <span>ประเภทคำสั่ง (สร้างการจอง, อนุมัติ, ปฏิเสธ, ปรับการตั้งค่า)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-              <span>ชื่อและบทบาทของผู้กระทำ (Actor & Role)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-              <span>IP Address และคำอธิบายบันทึก (Details & Remarks)</span>
-            </li>
-          </ul>
         </div>
       </div>
     </div>
