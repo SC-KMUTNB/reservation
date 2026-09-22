@@ -73,6 +73,41 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## Google OAuth Setup (Optional)
+
+Admin users can link their Google accounts for one-click login. Only `@email.kmutnb.ac.th` Google accounts are accepted.
+
+### 1. Create OAuth Credentials in Google Cloud Console
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a project.
+3. Navigate to **APIs & Services → Credentials**.
+4. Click **Create Credentials → OAuth 2.0 Client ID**.
+5. Set **Application type** to **Web application**.
+6. Add **Authorized redirect URIs**:
+   - Development: `http://localhost:3000/api/auth/google/callback`
+   - Production: `https://your-domain.com/api/auth/google/callback`
+7. Copy the **Client ID** and **Client Secret**.
+
+### 2. Configure Environment Variables
+
+Add to your `.env`:
+```env
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+```
+
+### 3. Admin Linking Flow
+
+1. Super Admin creates an admin account via `/admin/users`.
+2. The admin logs in with email/password, goes to **โปรไฟล์ของฉัน** (`/admin/profile`).
+3. Clicks **"เชื่อมบัญชี Google"** and authorizes with their `@email.kmutnb.ac.th` Google account.
+4. After linking, the admin can use the **"เข้าสู่ระบบด้วย Google"** button on the login page.
+
+> ℹ️ If `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are not set, the Google OAuth button will show an error message when clicked. The system works fine without Google OAuth — it's an optional convenience feature.
+
+---
+
 ## Deploying to Vercel
 
 1. **Push your code to GitHub / GitLab**.
@@ -81,7 +116,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    - `DATABASE_URL`: Your cloud PostgreSQL connection string (Neon, Supabase, or Vercel Postgres).
    - `JWT_SECRET`: A secure random string for JWT session encryption.
    - `NEXT_PUBLIC_APP_URL`: Your production domain (e.g. `https://your-domain.vercel.app`).
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` *(optional)*: For Google OAuth admin login.
 4. **Build Command**:
    - Vercel will automatically run `prisma generate && next build` defined in `package.json`.
 5. **Run Database Migrations / Seed**:
    Run `bunx prisma db push` and `bun run seed` using your remote connection string.
+

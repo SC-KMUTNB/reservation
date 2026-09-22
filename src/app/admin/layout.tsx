@@ -107,6 +107,12 @@ export default function AdminLayout({
       icon: History,
       desc: 'บันทึกการตรวจสอบระบบ',
     },
+    {
+      label: 'โปรไฟล์ของฉัน',
+      href: '/admin/profile',
+      icon: UserCheck,
+      desc: 'จัดการบัญชีและเชื่อม Google',
+    },
     ...(isSuperAdmin
       ? [
           {

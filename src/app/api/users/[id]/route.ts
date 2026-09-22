@@ -10,11 +10,16 @@ export async function PATCH(
 ) {
   try {
     const session = await getSessionFromRequest(request);
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'เฉพาะ Super Admin เท่านั้นที่สามารถแก้ไขข้อมูลผู้ใช้ได้' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ error: 'ไม่ได้รับอนุญาต (กรุณาเข้าสู่ระบบ)' }, { status: 401 });
     }
 
     const { id } = await params;
+    const isSelf = session.id === id;
+    if (!isSelf && session.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'เฉพาะ Super Admin เท่านั้นที่สามารถแก้ไขข้อมูลผู้ใช้อื่นได้' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { fullName, role, isActive, password } = body;
 
@@ -28,8 +33,10 @@ export async function PATCH(
 
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName.trim();
-    if (role !== undefined) updateData.role = role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN';
-    if (isActive !== undefined) {
+    if (session.role === 'SUPER_ADMIN' && role !== undefined) {
+      updateData.role = role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN';
+    }
+    if (session.role === 'SUPER_ADMIN' && isActive !== undefined) {
       if (id === session.id && isActive === false) {
         return NextResponse.json({ error: 'คุณไม่สามารถระงับการใช้งานบัญชีของตนเองได้' }, { status: 400 });
       }

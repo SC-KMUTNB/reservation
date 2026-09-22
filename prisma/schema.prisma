@@ -26,6 +26,8 @@ model User {
   fullName         String
   role             Role        @default(ADMIN)
   isActive         Boolean     @default(true)
+  googleId         String?     @unique
+  googleEmail      String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   approvedBookings Booking[]   @relation("ApprovedBy")
