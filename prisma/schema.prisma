@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model User {
+  id               String      @id @default(cuid())
+  email            String      @unique
+  passwordHash     String
+  fullName         String
+  role             Role        @default(ADMIN)
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  approvedBookings Booking[]   @relation("ApprovedBy")
+  auditLogs        AuditLog[]
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  bookingCode     String        @unique
+  date            String
+  startTime       String
+  endTime         String
+  fullName        String
+  studentId       String
+  email           String
+  phone           String
+  department      String
+  reason          String
+  status          BookingStatus @default(PENDING)
+  rejectionReason String?
+  approvedById    String?
+  approvedBy      User?         @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  auditLogs       AuditLog[]
+
+  @@index([date])
+  @@index([status])
+  @@index([studentId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  details    String
+  actorName  String
+  actorEmail String?
+  actorRole  String?
+  ipAddress  String?
+  bookingId  String?
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model SiteSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
