@@ -3,18 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   History,
-  Shield,
-  Filter,
-  Clock,
-  User,
-  Activity,
   CheckCircle,
   XCircle,
-  Settings,
+  Activity,
   LogIn,
-  AlertCircle,
-  Terminal,
-  Globe
+  Settings,
+  Clock,
+  Globe,
+  Trash2,
+  CalendarX2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 
 interface AuditLogItem {
@@ -42,10 +41,29 @@ const ACTION_TABS = [
   { id: 'SETTINGS', label: 'แก้ไขการตั้งค่า' },
 ];
 
+type ConfirmMode = 'all' | 'before' | null;
+
 export default function AdminLogsPage() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [actionFilter, setActionFilter] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Clear modal state
+  const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
+  const [beforeDate, setBeforeDate] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearResult, setClearResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check role from /api/auth/me
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.role === 'SUPER_ADMIN') setIsSuperAdmin(true);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchLogs(actionFilter);
@@ -66,7 +84,40 @@ export default function AdminLogsPage() {
     }
   };
 
+  const handleClear = async () => {
+    if (!confirmMode) return;
+    setIsClearing(true);
+    try {
+      let url = '/api/logs?mode=all';
+      if (confirmMode === 'before') {
+        if (!beforeDate) return;
+        url = `/api/logs?mode=before&before=${encodeURIComponent(new Date(beforeDate).toISOString())}`;
+      }
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        setClearResult(`ล้างบันทึกสำเร็จ — ${data.deletedCount} รายการถูกลบ`);
+        fetchLogs(actionFilter);
+      } else {
+        setClearResult(`เกิดข้อผิดพลาด: ${data.error}`);
+      }
+    } catch {
+      setClearResult('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    } finally {
+      setIsClearing(false);
+      setConfirmMode(null);
+      setBeforeDate('');
+    }
+  };
+
   const getActionBadge = (action: string) => {
+    if (action === 'AUDIT_LOGS_CLEARED') {
+      return (
+        <span className="bg-rose-50 text-rose-800 border border-rose-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <Trash2 className="w-3 h-3 text-rose-600" /> ล้าง Audit Logs
+        </span>
+      );
+    }
     if (action.includes('APPROVED')) {
       return (
         <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
@@ -109,17 +160,52 @@ export default function AdminLogsPage() {
     );
   };
 
+  // Today's date in YYYY-MM-DD for the date picker max
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div>
-        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          บันทึกการตรวจสอบระบบ (Audit Logs)
-        </h2>
-        <p className="text-xs text-slate-500 mt-1 font-light">
-          บันทึกประวัติการกระทำทั้งหมดในระบบโดยอัตโนมัติ เพื่อความโปร่งใสและตรวจสอบย้อนหลังได้
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            บันทึกการตรวจสอบระบบ (Audit Logs)
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 font-light">
+            บันทึกประวัติการกระทำทั้งหมดในระบบโดยอัตโนมัติ เพื่อความโปร่งใสและตรวจสอบย้อนหลังได้
+          </p>
+        </div>
+
+        {/* Clear buttons — Super Admin only */}
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setConfirmMode('before')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition active-press cursor-pointer"
+            >
+              <CalendarX2 className="w-3.5 h-3.5" />
+              ล้างตามวันที่
+            </button>
+            <button
+              onClick={() => setConfirmMode('all')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition active-press cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              ล้างทั้งหมด
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Clear result toast */}
+      {clearResult && (
+        <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3 rounded-2xl">
+          <span>{clearResult}</span>
+          <button onClick={() => setClearResult(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Main Container */}
       <div className="bg-white rounded-3xl p-6 md:p-7 border border-slate-200/90 shadow-warm space-y-5">
@@ -210,6 +296,60 @@ export default function AdminLogsPage() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-slate-900">
+                  {confirmMode === 'all' ? 'ล้างบันทึกทั้งหมด?' : 'ล้างบันทึกตามวันที่?'}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {confirmMode === 'all'
+                    ? 'รายการทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้'
+                    : 'รายการก่อนหน้าวันที่เลือกจะถูกลบถาวร'}
+                </div>
+              </div>
+            </div>
+
+            {confirmMode === 'before' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  ลบบันทึกก่อนวันที่
+                </label>
+                <input
+                  type="date"
+                  max={todayStr}
+                  value={beforeDate}
+                  onChange={(e) => setBeforeDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setConfirmMode(null); setBeforeDate(''); }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer active-press"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleClear}
+                disabled={isClearing || (confirmMode === 'before' && !beforeDate)}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition disabled:opacity-50 cursor-pointer active-press"
+              >
+                {isClearing ? 'กำลังลบ...' : 'ยืนยันลบ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

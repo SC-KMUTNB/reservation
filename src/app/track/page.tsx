@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -289,12 +290,37 @@ function TrackContent() {
                       </div>
                     )}
 
-                    {isApproved && (
-                      <div className="bg-emerald-50/70 border border-emerald-200/90 text-emerald-800 p-3 rounded-2xl text-xs flex items-center gap-2">
-                        <span className="text-emerald-600 font-bold">✓</span>
-                        <span>กรุณาแสดงรหัสการจองนี้ต่อเจ้าหน้าที่ดูแลห้อง และปฏิบัติตามกฎระเบียบอย่างเคร่งครัด</span>
+                    {/* QR Code — shown for all statuses */}
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50/80 border border-slate-100 rounded-2xl p-4">
+                      <div className="shrink-0 p-2 bg-white rounded-xl border border-slate-200 shadow-xs">
+                        <QRCodeSVG
+                          value={`${process.env.NEXT_PUBLIC_APP_URL || ''}/track?q=${encodeURIComponent(item.bookingCode)}`}
+                          size={96}
+                          level="M"
+                          includeMargin={false}
+                          fgColor={isApproved ? '#059669' : isPending ? '#d97706' : '#e11d48'}
+                        />
                       </div>
-                    )}
+                      <div className="text-xs text-slate-600 text-center sm:text-left">
+                        <div className="font-bold text-slate-800 mb-1">QR Code สำหรับการจอง</div>
+                        <div className="text-slate-500 mb-2">สแกนเพื่อดูข้อมูลการจองนี้ได้ทันที</div>
+                        {isApproved && (
+                          <div className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl font-semibold">
+                            ✓ แสดง QR นี้ต่อเจ้าหน้าที่ดูแลห้องเพื่อยืนยันการใช้งาน
+                          </div>
+                        )}
+                        {isPending && (
+                          <div className="text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-xl font-semibold">
+                            ⏳ รอการอนุมัติ — กรุณาตรวจสอบสถานะอีกครั้ง
+                          </div>
+                        )}
+                        {isRejected && (
+                          <div className="text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-xl font-semibold">
+                            ✕ คำขอนี้ถูกปฏิเสธแล้ว
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
