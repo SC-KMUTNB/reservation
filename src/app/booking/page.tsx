@@ -710,7 +710,7 @@ export default function BookingPage() {
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1 text-xs">หน่วยงาน / ชุมนุม / สโมสร</label>
+                <label className="block font-medium text-slate-700 mb-1 text-xs">หน่วยงาน / ชมรม / สโมสร</label>
                 <input
                   type="text"
                   required
