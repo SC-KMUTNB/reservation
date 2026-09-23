@@ -45,6 +45,7 @@ async function main() {
     { key: 'social_tiktok_title', value: 'สภานักศึกษา มจพ.', description: 'ชื่อแสดง TikTok' },
     { key: 'complaint_url', value: 'https://forms.gle/your-google-form-link', description: 'ลิงก์ Google Form รับเรื่องร้องเรียน' },
     { key: 'rules_content', value: '1. ห้ามนำอาหารและเครื่องดื่ม (ยกเว้นน้ำเปล่า) เข้ามารับประทานในห้องประชุมเด็ดขาด\n2. ช่วยกันรักษาความสะอาด ปิดไฟ และเครื่องปรับอากาศทุกครั้งหลังใช้งานเสร็จ\n⚠️ คำเตือน: หากทำผิดกฎระเบียบ ท่านจะไม่สามารถจองห้องประชุมได้อีกเป็นเวลา 2 เดือนเต็ม', description: 'กฎระเบียบการใช้ห้องประชุม' },
+    { key: 'timezone', value: 'Asia/Bangkok', description: 'Timezone ระบบ' },
     { key: 'contact_email', value: 'council@kmutnb.ac.th', description: 'อีเมลติดต่อ' },
     { key: 'contact_phone', value: '02-555-2000 ต่อ 1133', description: 'เบอร์ติดต่อ' },
   ];
