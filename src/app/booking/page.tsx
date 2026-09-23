@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Calendar as CalendarIcon,
@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Copy,
   Check,
+  RotateCw,
   Building2,
   User,
   Mail,
@@ -43,6 +44,8 @@ const MONTH_NAMES_TH = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
 ];
 
+const PRELOAD_MONTHS_AHEAD = 3;
+
 // Operational hours: 08:00 - 20:00 (hourly intervals)
 const OPERATIONAL_SLOTS = [
   { start: '08:00', end: '09:00', label: '08:00 - 09:00' },
@@ -63,9 +66,32 @@ function isTimeOverlapping(start1: string, end1: string, start2: string, end2: s
   return start1 < end2 && end1 > start2;
 }
 
+function formatMonthKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getMonthWindow(baseMonthStr: string, monthsAhead: number) {
+  const [yearRaw, monthRaw] = baseMonthStr.split('-').map(Number);
+  const baseYear = Number.isFinite(yearRaw) ? yearRaw : new Date().getFullYear();
+  const baseMonth = Number.isFinite(monthRaw) ? monthRaw - 1 : new Date().getMonth();
+
+  const monthKeys = Array.from({ length: monthsAhead + 1 }, (_, idx) =>
+    formatMonthKey(new Date(baseYear, baseMonth + idx, 1))
+  );
+
+  const startDate = formatDateKey(new Date(baseYear, baseMonth, 1));
+  const endDate = formatDateKey(new Date(baseYear, baseMonth + monthsAhead + 1, 0));
+
+  return { monthKeys, startDate, endDate };
+}
+
 export default function BookingPage() {
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [bookingsByMonth, setBookingsByMonth] = useState<Record<string, BookingItem[]>>({});
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -90,6 +116,7 @@ export default function BookingPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const formattedMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const bookings = useMemo(() => bookingsByMonth[formattedMonthStr] || [], [bookingsByMonth, formattedMonthStr]);
 
   const todayStr = useMemo(() => {
     const today = new Date();
@@ -99,10 +126,6 @@ export default function BookingPage() {
   useEffect(() => {
     fetchSettings();
   }, []);
-
-  useEffect(() => {
-    fetchBookings(formattedMonthStr);
-  }, [formattedMonthStr]);
 
   const fetchSettings = async () => {
     try {
@@ -116,20 +139,46 @@ export default function BookingPage() {
     }
   };
 
-  const fetchBookings = async (monthStr: string) => {
+  const fetchBookingsWindow = useCallback(async (monthStr: string, forceReload = false) => {
+    const { monthKeys, startDate, endDate } = getMonthWindow(monthStr, PRELOAD_MONTHS_AHEAD);
+    const hasAllMonths = monthKeys.every((key) => bookingsByMonth[key] !== undefined);
+
+    if (!forceReload && hasAllMonths) {
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/bookings?month=${monthStr}`);
+      const res = await fetch(`/api/bookings?startDate=${startDate}&endDate=${endDate}`);
       if (res.ok) {
         const data = await res.json();
-        setBookings(data.bookings || []);
+        const grouped: Record<string, BookingItem[]> = {};
+        monthKeys.forEach((key) => {
+          grouped[key] = [];
+        });
+
+        (data.bookings || []).forEach((booking: BookingItem) => {
+          const monthKey = booking.date.slice(0, 7);
+          if (grouped[monthKey]) {
+            grouped[monthKey].push(booking);
+          }
+        });
+
+        setBookingsByMonth((prev) => ({
+          ...prev,
+          ...grouped,
+        }));
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [bookingsByMonth]);
+
+  useEffect(() => {
+    void fetchBookingsWindow(formattedMonthStr);
+  }, [formattedMonthStr, fetchBookingsWindow]);
 
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -253,7 +302,8 @@ export default function BookingPage() {
         startTime: '09:00',
         endTime: '11:00',
       });
-      fetchBookings(formattedMonthStr);
+      const selectedMonth = selectedDate.slice(0, 7) || formattedMonthStr;
+      await fetchBookingsWindow(selectedMonth, true);
     } catch (e) {
       console.error(e);
       setErrorMessage('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -397,7 +447,7 @@ export default function BookingPage() {
           </div>
 
           {/* Month Header Switcher */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-6">
             <button
               onClick={prevMonth}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs md:text-sm font-semibold transition active-press flex items-center gap-1 cursor-pointer"
@@ -405,10 +455,18 @@ export default function BookingPage() {
               <ChevronLeft className="w-4 h-4" /> เดือนก่อนหน้า
             </button>
 
-            <div className="text-center">
+            <div className="text-center order-first sm:order-none">
               <h4 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight">
                 {MONTH_NAMES_TH[month]} <span className="tabular-nums font-mono text-orange-600">{year + 543}</span>
               </h4>
+              <button
+                onClick={() => void fetchBookingsWindow(formattedMonthStr, true)}
+                disabled={isLoading}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                รีโหลดข้อมูล
+              </button>
             </div>
 
             <button
