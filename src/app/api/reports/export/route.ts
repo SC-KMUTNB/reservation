@@ -3,6 +3,50 @@ import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/auth';
 import ExcelJS from 'exceljs';
 
+const DEFAULT_TIMEZONE = 'Asia/Bangkok';
+
+function resolveTimezone(timezone?: string | null): string {
+  const value = timezone?.trim() || DEFAULT_TIMEZONE;
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+function formatDateTimeInTimezone(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value || '';
+
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')} ${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
+}
+
+function formatDateInTimezone(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value || '';
+
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSessionFromRequest(request);
@@ -27,6 +71,12 @@ export async function GET(request: NextRequest) {
     if (status && status !== 'ALL') {
       bookingWhere.status = status;
     }
+
+    const timezoneSetting = await prisma.siteSetting.findUnique({
+      where: { key: 'timezone' },
+      select: { value: true },
+    });
+    const timezone = resolveTimezone(timezoneSetting?.value);
 
     const bookings = await prisma.booking.findMany({
       where: bookingWhere,
@@ -79,7 +129,7 @@ export async function GET(request: NextRequest) {
       { header: 'สถานะ', key: 'status', width: 16 },
       { header: 'เหตุผลการปฏิเสธ (ถ้ามี)', key: 'rejectionReason', width: 30 },
       { header: 'ผู้อนุมัติ/จัดการ', key: 'approvedBy', width: 24 },
-      { header: 'วันเวลาที่อนุมัติ', key: 'approvedAt', width: 20 },
+      { header: `วันเวลาที่อนุมัติ (${timezone})`, key: 'approvedAt', width: 24 },
     ];
 
     const headerRow1 = sheet1.getRow(1);
@@ -120,7 +170,7 @@ export async function GET(request: NextRequest) {
         status: statusTranslations[b.status] || b.status,
         rejectionReason: b.rejectionReason || '-',
         approvedBy: b.approvedBy ? b.approvedBy.fullName : '-',
-        approvedAt: b.approvedAt ? b.approvedAt.toISOString().replace('T', ' ').slice(0, 19) : '-',
+        approvedAt: b.approvedAt ? formatDateTimeInTimezone(b.approvedAt, timezone) : '-',
       });
 
       row.height = 22;
@@ -148,7 +198,7 @@ export async function GET(request: NextRequest) {
 
     sheet2.columns = [
       { header: 'ลำดับ', key: 'index', width: 8 },
-      { header: 'วันเวลาที่เกิดเหตุการณ์ (UTC)', key: 'createdAt', width: 22 },
+      { header: `วันเวลาที่เกิดเหตุการณ์ (${timezone})`, key: 'createdAt', width: 24 },
       { header: 'ประเภทกิจกรรม (Action)', key: 'action', width: 24 },
       { header: 'ผู้กระทำ (Actor)', key: 'actorName', width: 24 },
       { header: 'อีเมลผู้กระทำ', key: 'actorEmail', width: 26 },
@@ -177,7 +227,7 @@ export async function GET(request: NextRequest) {
     auditLogs.forEach((l, idx) => {
       const row = sheet2.addRow({
         index: idx + 1,
-        createdAt: l.createdAt.toISOString().replace('T', ' ').slice(0, 19),
+        createdAt: formatDateTimeInTimezone(l.createdAt, timezone),
         action: l.action,
         actorName: l.actorName,
         actorEmail: l.actorEmail || '-',
@@ -199,7 +249,7 @@ export async function GET(request: NextRequest) {
 
     const buffer = await workbook.xlsx.writeBuffer();
 
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const timestamp = formatDateInTimezone(new Date(), timezone);
     const fileName = `KMUTNB_Council_Reservation_Report_${timestamp}.xlsx`;
 
     return new NextResponse(buffer, {

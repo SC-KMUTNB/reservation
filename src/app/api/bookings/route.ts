@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const month = searchParams.get('month'); // YYYY-MM
     const date = searchParams.get('date');   // YYYY-MM-DD
+    const startDate = searchParams.get('startDate'); // YYYY-MM-DD
+    const endDate = searchParams.get('endDate'); // YYYY-MM-DD
     const status = searchParams.get('status');
 
     const session = await getSessionFromRequest(request);
@@ -25,6 +27,14 @@ export async function GET(request: NextRequest) {
       where.date = {
         startsWith: month,
       };
+    } else if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        where.date.gte = startDate;
+      }
+      if (endDate) {
+        where.date.lte = endDate;
+      }
     }
 
     if (status && status !== 'ALL') {
