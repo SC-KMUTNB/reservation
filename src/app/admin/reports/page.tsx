@@ -13,7 +13,15 @@ import {
   ArrowRight,
   Sparkles,
   Table,
-  Layers
+  Layers,
+  UploadCloud,
+  FileUp,
+  AlertTriangle,
+  RefreshCw,
+  X,
+  Database,
+  PlusCircle,
+  HelpCircle
 } from 'lucide-react';
 
 export default function AdminReportsPage() {
@@ -23,6 +31,21 @@ export default function AdminReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [activePreset, setActivePreset] = useState<number | null>(0);
 
+  // Super Admin state & Sheet Migration
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'overwrite' | 'add'>('overwrite');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<{
+    mode: 'overwrite' | 'add';
+    totalRows: number;
+    imported: number;
+    updated: number;
+    skipped: number;
+  } | null>(null);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
+  const [migrationSuccess, setMigrationSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -30,6 +53,16 @@ export default function AdminReportsPage() {
 
     setStartDate(firstDay.toISOString().slice(0, 10));
     setEndDate(lastDay.toISOString().slice(0, 10));
+
+    // Check if Super Admin
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user?.role === 'SUPER_ADMIN') {
+          setIsSuperAdmin(true);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const setMonthRange = (offset: number) => {
@@ -56,15 +89,43 @@ export default function AdminReportsPage() {
     }, 2000);
   };
 
+  const executeMigration = async () => {
+    setIsImportModalOpen(false);
+    setIsMigrating(true);
+    setMigrationError(null);
+    setMigrationSuccess(null);
+    setMigrationResult(null);
+
+    try {
+      const res = await fetch('/api/admin/migrate-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: importMode }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMigrationError(data.error || 'การนำเข้าข้อมูลล้มเหลว');
+      } else {
+        setMigrationSuccess(data.message || 'นำเข้าข้อมูลประวัติสำเร็จ');
+        setMigrationResult(data.result);
+      }
+    } catch (err: any) {
+      setMigrationError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Title */}
       <div>
         <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          ศูนย์ส่งออกรายงานสำหรับผู้บริหาร
+          ศูนย์ส่งออกรายงาน & จัดการข้อมูลประวัติ
         </h2>
         <p className="text-xs text-slate-500 mt-1 font-light">
-          ส่งออกไฟล์ Microsoft Excel (.xlsx) สองแผ่นงานเพื่อใช้ประกอบการรายงานผลและตรวจสอบความโปร่งใส
+          ส่งออกไฟล์ Microsoft Excel (.xlsx) สองแผ่นงานเพื่อใช้ประกอบการรายงานผล และนำเข้าข้อมูลประวัติเดิม
         </p>
       </div>
 
@@ -209,6 +270,198 @@ export default function AdminReportsPage() {
           </button>
         </div>
       </div>
+
+      {/* Super Admin Section: Sheet Migration from sheetexample */}
+      {isSuperAdmin && (
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-orange-200/90 shadow-warm space-y-5">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                <FileUp className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-slate-900">
+                    นำเข้าข้อมูลประวัติจากโฟลเดอร์ชีต (Import Sheet History)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    Super Admin Only
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  อ่านไฟล์ <code className="font-mono text-orange-600 font-semibold">sheetexample/*.xlsx</code> เพื่อนำเข้าประวัติการจองห้องประชุมเก่าเข้าสู่ระบบ
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={isMigrating}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-warm-xs transition flex items-center justify-center gap-2 active-press cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${isMigrating ? 'animate-spin' : ''}`} />
+              <span>{isMigrating ? 'กำลังประมวลผลข้อมูลชีต...' : 'นำเข้าข้อมูลประวัติ (Import)'}</span>
+            </button>
+          </div>
+
+          {/* Feedback messages */}
+          {migrationError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-4 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="font-medium">{migrationError}</span>
+              </div>
+              <button type="button" onClick={() => setMigrationError(null)} className="text-rose-600 font-bold p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {migrationSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-4 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-medium">{migrationSuccess}</span>
+              </div>
+              <button type="button" onClick={() => setMigrationSuccess(null)} className="text-emerald-600 font-bold p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {migrationResult && (
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <div className="text-[11px] font-bold text-slate-700">
+                ผลการนำเข้า (โหมด: {migrationResult.mode === 'overwrite' ? 'เขียนทับข้อมูลเดิม (Overwrite)' : 'เพิ่มเฉพาะรายการใหม่ (Add into)'}):
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-2 bg-white rounded-xl border border-slate-200">
+                  <div className="text-[11px] text-slate-500 font-medium">แถวทั้งหมดในไฟล์</div>
+                  <div className="text-lg font-extrabold text-slate-900 mt-0.5">{migrationResult.totalRows}</div>
+                </div>
+                <div className="text-center p-2 bg-white rounded-xl border border-slate-200">
+                  <div className="text-[11px] text-emerald-600 font-medium">นำเข้าใหม่สำเร็จ</div>
+                  <div className="text-lg font-extrabold text-emerald-600 mt-0.5">+{migrationResult.imported}</div>
+                </div>
+                <div className="text-center p-2 bg-white rounded-xl border border-slate-200">
+                  <div className="text-[11px] text-blue-600 font-medium">เขียนทับ/อัปเดต</div>
+                  <div className="text-lg font-extrabold text-blue-600 mt-0.5">{migrationResult.updated}</div>
+                </div>
+                <div className="text-center p-2 bg-white rounded-xl border border-slate-200">
+                  <div className="text-[11px] text-slate-500 font-medium">ข้ามรายการเดิม</div>
+                  <div className="text-lg font-extrabold text-slate-400 mt-0.5">{migrationResult.skipped}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Migration Mode Confirmation Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    เลือกรูปแบบการนำเข้าข้อมูลประวัติ
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    คุณต้องการเขียนทับหรือเพิ่มเฉพาะข้อมูลใหม่เข้าสู่ระบบ?
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode selection radio cards */}
+            <div className="space-y-3">
+              <label
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border cursor-pointer transition ${
+                  importMode === 'overwrite'
+                    ? 'border-orange-500 bg-orange-50/50 shadow-xs ring-2 ring-orange-500/20'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="overwrite"
+                  checked={importMode === 'overwrite'}
+                  onChange={() => setImportMode('overwrite')}
+                  className="mt-1 text-orange-600 focus:ring-orange-500"
+                />
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>1. เขียนทับข้อมูลเดิม (Overwrite)</span>
+                    <span className="text-[10px] font-semibold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                      แนะนำสำหรับข้อมูลล่าสุด
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    หากพบรายการที่มีรหัสการจองตรงกัน ระบบจะอัปเดตข้อมูลให้ตรงกับไฟล์ชีตล่าสุด และนำเข้ารายการใหม่ที่ยังไม่เคยมี
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3.5 p-4 rounded-2xl border cursor-pointer transition ${
+                  importMode === 'add'
+                    ? 'border-orange-500 bg-orange-50/50 shadow-xs ring-2 ring-orange-500/20'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="add"
+                  checked={importMode === 'add'}
+                  onChange={() => setImportMode('add')}
+                  className="mt-1 text-orange-600 focus:ring-orange-500"
+                />
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>2. เพิ่มเฉพาะรายการใหม่ (Add into)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    ไม่แตะต้องหรือแก้ไขข้อมูลเดิมที่มีอยู่ในระบบ ข้ามรายการเดิม และเพิ่มเฉพาะรายการใหม่ที่ยังไม่เคยมีในระบบ
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Modal actions */}
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={executeMigration}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-warm-xs transition flex items-center gap-2 active-press cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>ยืนยันเริ่มนำเข้า</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

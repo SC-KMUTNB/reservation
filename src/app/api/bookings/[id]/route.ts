@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/auth';
 import { recordAuditLog } from '@/lib/audit';
+import { notifyUserBookingStatusUpdate } from '@/lib/email';
+import { syncBookingToGoogleSheet } from '@/lib/google-sheets';
 
 function hasTimeOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
   return start1 < end2 && end1 > start2;
@@ -91,6 +93,39 @@ export async function PATCH(
       bookingId: id,
       userId: session.id,
     });
+
+    if (['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) {
+      notifyUserBookingStatusUpdate({
+        bookingCode: updated.bookingCode,
+        fullName: updated.fullName,
+        email: updated.email,
+        date: updated.date,
+        startTime: updated.startTime,
+        endTime: updated.endTime,
+        status: updated.status as any,
+        rejectionReason: updated.rejectionReason,
+      }).catch((err) => console.error('User status email failed:', err));
+
+      syncBookingToGoogleSheet(
+        {
+          bookingCode: updated.bookingCode,
+          date: updated.date,
+          startTime: updated.startTime,
+          endTime: updated.endTime,
+          fullName: updated.fullName,
+          studentId: updated.studentId,
+          email: updated.email,
+          phone: updated.phone,
+          department: updated.department,
+          reason: updated.reason,
+          status: updated.status,
+          rejectionReason: updated.rejectionReason,
+          approvedBy: session.fullName,
+          createdAt: updated.createdAt,
+        },
+        'UPDATE'
+      ).catch((err) => console.error('Google Sheet update failed:', err));
+    }
 
     return NextResponse.json({ success: true, booking: updated });
   } catch (error) {
