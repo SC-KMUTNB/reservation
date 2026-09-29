@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       email: true,
+      username: true,
       fullName: true,
       role: true,
       isActive: true,
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     user: {
       id: user.id,
       email: user.email,
+      username: user.username,
       fullName: user.fullName,
       role: user.role,
       isGoogleLinked: !!user.googleId,

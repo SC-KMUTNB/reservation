@@ -4,10 +4,12 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Shield, Key, Lock, CheckCircle2, AlertCircle, RotateCw, Sparkles, ChevronRight } from 'lucide-react';
+import ClaimUsernameModal from '@/components/admin/ClaimUsernameModal';
 
 interface ProfileUser {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
   isGoogleLinked: boolean;
@@ -18,6 +20,7 @@ function MobileProfileContent() {
   const router = useRouter();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
 
   // Form states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -139,6 +142,34 @@ function MobileProfileContent() {
         </div>
       </div>
 
+      {/* Username Setup Card */}
+      <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+            <User className="w-4 h-4 text-orange-600" />
+            <span>ชื่อผู้ใช้สำหรับล็อกอิน (Username)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsClaimModalOpen(true)}
+            className="text-xs text-orange-600 hover:text-orange-700 font-bold bg-orange-50 hover:bg-orange-100 px-3 py-1 rounded-xl transition cursor-pointer"
+          >
+            {user?.username ? 'แก้ไขชื่อผู้ใช้' : '+ ตั้งชื่อผู้ใช้'}
+          </button>
+        </div>
+
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <div className="text-[10px] text-slate-400">Username สำหรับล็อกอินแทนอีเมล:</div>
+          <div className="font-mono text-xs font-bold text-slate-800 mt-0.5">
+            {user?.username ? (
+              <span className="text-orange-600 text-sm">@{user.username}</span>
+            ) : (
+              <span className="text-slate-400 font-normal italic">ยังไม่ได้ตั้งชื่อผู้ใช้ (ใช้อีเมลเข้าสู่ระบบ)</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* System Changelog Link Card */}
       <Link
         href="/m/admin/changelog"
@@ -231,6 +262,18 @@ function MobileProfileContent() {
           </button>
         </form>
       </div>
+
+      {/* Claim / Edit Username Modal */}
+      <ClaimUsernameModal
+        isOpen={isClaimModalOpen}
+        userFullName={user?.fullName}
+        onClose={() => setIsClaimModalOpen(false)}
+        onSuccess={(claimedUsername) => {
+          setUser((prev) => (prev ? { ...prev, username: claimedUsername } : null));
+          setIsClaimModalOpen(false);
+          setSuccessMsg(`บันทึกชื่อผู้ใช้ @${claimedUsername} เรียบร้อยแล้ว`);
+        }}
+      />
     </div>
   );
 }

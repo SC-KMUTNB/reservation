@@ -569,3 +569,103 @@ export async function notifyUserBookingStatusUpdate(booking: {
 
   return res;
 }
+
+/**
+ * 4. Send invitation email to a newly created admin with a secure setup password link.
+ */
+export async function sendAdminInviteEmail(params: {
+  email: string;
+  fullName: string;
+  role: 'SUPER_ADMIN' | 'ADMIN';
+  inviteToken: string;
+  inviterName?: string;
+}) {
+  const { email, fullName, role, inviteToken, inviterName } = params;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    process.env.BASE_URL ||
+    'http://localhost:3000';
+  const setupUrl = `${baseUrl}/admin/setup-password?token=${encodeURIComponent(inviteToken)}`;
+
+  const roleText =
+    role === 'SUPER_ADMIN' ? 'Super Admin (ผู้ดูแลระบบหลัก)' : 'Admin (เจ้าหน้าที่ดูแลระบบ)';
+
+  const html = emailWrapper(
+    'คำเชิญเข้าร่วมเป็นผู้ดูแลระบบ สภานักศึกษา มจพ.',
+    `
+    <div style="margin-bottom: 24px;">
+      <span style="background-color: #ffedd5; color: #c2410c; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase;">
+        คำเชิญผู้ดูแลระบบใหม่ (ADMIN INVITATION)
+      </span>
+      <h2 style="margin: 14px 0 8px; font-size: 18px; color: #0f172a;">เรียน คุณ ${fullName}</h2>
+      <p style="margin: 0; font-size: 14px; color: #475569; line-height: 1.6;">
+        ${inviterName ? `<strong>${inviterName}</strong> ได้ส่งคำเชิญ` : 'คุณได้รับคำเชิญ'}ให้เข้าร่วมเป็นผู้ดูแลระบบในระบบบริหารจัดการและจองห้องประชุม สภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.)
+      </p>
+    </div>
+
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 12px; padding: 16px; margin-bottom: 24px; font-size: 13px; line-height: 1.8;">
+      <tr>
+        <td style="color: #64748b; width: 35%;">ชื่อ-นามสกุล:</td>
+        <td style="color: #0f172a; font-weight: 600;">${fullName}</td>
+      </tr>
+      <tr>
+        <td style="color: #64748b;">อีเมลบัญชี:</td>
+        <td style="color: #0f172a; font-weight: 600; font-family: monospace;">${email}</td>
+      </tr>
+      <tr>
+        <td style="color: #64748b;">ระดับสิทธิ์ (Role):</td>
+        <td>
+          <span style="background-color: ${role === 'SUPER_ADMIN' ? '#ffedd5' : '#eff6ff'}; color: ${role === 'SUPER_ADMIN' ? '#c2410c' : '#1d4ed8'}; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">
+            ${roleText}
+          </span>
+        </td>
+      </tr>
+      <tr>
+        <td style="color: #64748b;">อายุการใช้งานลิงก์:</td>
+        <td style="color: #dc2626; font-weight: 600;">48 ชั่วโมง (ใช้งานได้เพียงครั้งเดียว)</td>
+      </tr>
+    </table>
+
+    <div style="text-align: center; margin: 30px 0 20px;">
+      <a href="${setupUrl}" style="background-color: #ea580c; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 14px; font-size: 14px; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);">
+        สร้างรหัสผ่านและเปิดใช้งานบัญชี &rarr;
+      </a>
+    </div>
+
+    <p style="margin: 20px 0 0; font-size: 11px; color: #94a3b8; text-align: center; word-break: break-all;">
+      หากปุ่มด้านบนไม่ทำงาน สามารถคัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์:<br>
+      <a href="${setupUrl}" style="color: #ea580c;">${setupUrl}</a>
+    </p>
+    `
+  );
+
+  const res = await sendEmail({
+    to: {
+      name: fullName,
+      address: email.trim(),
+    },
+    subject: `[คำเชิญผู้ดูแลระบบ] เข้าร่วมดูแลระบบจองห้องประชุม สภานักศึกษา มจพ.`,
+    html,
+  });
+
+  if (!res.success) {
+    console.error(`Invite email failed (${email}):`, res.error);
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERY_FAILED',
+      details: `ส่งอีเมลคำเชิญแอดมินล้มเหลว (${email}): ${res.error}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  } else if (res.provider && res.provider !== 'DISABLED' && res.provider !== 'UNCONFIGURED') {
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERED',
+      details: `ส่งอีเมลคำเชิญแอดมินไปยัง ${fullName} (${email}) สำเร็จ ผ่าน ${res.provider}`,
+      actorName: inviterName || 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  }
+
+  return res;
+}
+

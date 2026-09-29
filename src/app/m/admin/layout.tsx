@@ -17,10 +17,12 @@ import {
   Sparkles
 } from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
+import ClaimUsernameModal from '@/components/admin/ClaimUsernameModal';
 
 interface AdminUser {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
 }
@@ -34,9 +36,10 @@ export default function MobileAdminLayout({
   const router = useRouter();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
 
   useEffect(() => {
-    if (pathname === '/m/admin/login') {
+    if (pathname === '/m/admin/login' || pathname === '/m/admin/setup-password') {
       setIsLoading(false);
       return;
     }
@@ -47,6 +50,15 @@ export default function MobileAdminLayout({
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+
+          // Check if username claim prompt is needed
+          const dismissed =
+            typeof window !== 'undefined'
+              ? sessionStorage.getItem('username_prompt_dismissed')
+              : null;
+          if (!data.user?.username && !dismissed) {
+            setIsClaimModalOpen(true);
+          }
         } else {
           router.push('/m/admin/login');
         }
@@ -70,7 +82,7 @@ export default function MobileAdminLayout({
     }
   };
 
-  if (pathname === '/m/admin/login') {
+  if (pathname === '/m/admin/login' || pathname === '/m/admin/setup-password') {
     return <>{children}</>;
   }
 
@@ -138,7 +150,19 @@ export default function MobileAdminLayout({
                   {user?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">{user?.email}</p>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                {user?.username ? (
+                  <span className="text-orange-400 font-medium">@{user.username}</span>
+                ) : (
+                  <button
+                    onClick={() => setIsClaimModalOpen(true)}
+                    className="text-[9px] text-amber-400 underline font-medium cursor-pointer"
+                  >
+                    + ตั้ง Username
+                  </button>
+                )}
+                <span className="text-slate-400 truncate max-w-[140px]">{user?.email}</span>
+              </div>
             </div>
           </div>
 
@@ -202,6 +226,17 @@ export default function MobileAdminLayout({
           })}
         </div>
       </nav>
+
+      {/* First-time Username Claim Modal */}
+      <ClaimUsernameModal
+        isOpen={isClaimModalOpen}
+        userFullName={user?.fullName}
+        onClose={() => setIsClaimModalOpen(false)}
+        onSuccess={(claimedUsername) => {
+          setUser((prev) => (prev ? { ...prev, username: claimedUsername } : null));
+          setIsClaimModalOpen(false);
+        }}
+      />
     </div>
   );
 }

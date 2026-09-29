@@ -22,12 +22,15 @@ enum BookingStatus {
 model User {
   id               String      @id @default(cuid())
   email            String      @unique
+  username         String?     @unique
   passwordHash     String
   fullName         String
   role             Role        @default(ADMIN)
   isActive         Boolean     @default(true)
   googleId         String?     @unique
   googleEmail      String?
+  inviteToken      String?     @unique
+  inviteExpiresAt  DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   approvedBookings Booking[]   @relation("ApprovedBy")

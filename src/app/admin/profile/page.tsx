@@ -20,6 +20,7 @@ import {
 interface ProfileUser {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
   isGoogleLinked: boolean;
@@ -58,6 +59,7 @@ function ProfileContent() {
   const [isUnlinking, setIsUnlinking] = useState(false);
 
   const [fullNameInput, setFullNameInput] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -98,6 +100,7 @@ function ProfileContent() {
         const data = await res.json();
         setUser(data.user);
         setFullNameInput(data.user.fullName || '');
+        setUsernameInput(data.user.username || '');
       } else {
         router.push('/admin/login');
       }
@@ -115,6 +118,12 @@ function ProfileContent() {
     setActionSuccess(null);
     setActionError(null);
 
+    const cleanUsername = usernameInput.trim().toLowerCase();
+    if (cleanUsername && !/^[a-zA-Z0-9_.-]{3,20}$/.test(cleanUsername)) {
+      setActionError('ชื่อผู้ใช้ต้องมีความยาว 3-20 ตัวอักษร (a-z, 0-9, _, ., -) เท่านั้น');
+      return;
+    }
+
     if (passwordInput && passwordInput.length < 6) {
       setActionError('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
       return;
@@ -129,6 +138,7 @@ function ProfileContent() {
     try {
       const payload: any = {
         fullName: fullNameInput.trim(),
+        username: cleanUsername || null,
       };
       if (passwordInput.trim()) {
         payload.password = passwordInput.trim();
@@ -320,12 +330,53 @@ function ProfileContent() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">อีเมลผู้ดูแลระบบ (ล็อกอิน)</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">อีเมลผู้ดูแลระบบ (Email)</label>
             <input
               type="text"
               disabled
               value={user.email}
               className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-500 cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              ชื่อผู้ใช้สำหรับล็อกอิน (Username)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500 font-bold font-mono text-xs">
+                @
+              </span>
+              <input
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                maxLength={20}
+                value={usernameInput}
+                onChange={(e) =>
+                  setUsernameInput(
+                    e.target.value.toLowerCase().replace(/[^a-zA-Z0-9_.-]/g, '')
+                  )
+                }
+                placeholder="somchai.k หรือ admin_sc"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3.5 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              ใช้สำหรับเข้าสู่ระบบแทนอีเมลยาวๆ (3-20 ตัวอักษร a-z, 0-9, _, ., -)
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล ที่แสดงในระบบ</label>
+            <input
+              type="text"
+              required
+              value={fullNameInput}
+              onChange={(e) => setFullNameInput(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
             />
           </div>
 
@@ -344,17 +395,6 @@ function ProfileContent() {
               </span>
             </div>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล ที่แสดงในระบบ</label>
-          <input
-            type="text"
-            required
-            value={fullNameInput}
-            onChange={(e) => setFullNameInput(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
-          />
         </div>
 
         <div className="pt-3 border-t border-slate-100">

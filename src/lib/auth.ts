@@ -13,6 +13,7 @@ const SECRET_KEY = new TextEncoder().encode(
 export interface SessionUser {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
 }
@@ -21,6 +22,7 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
   return await new SignJWT({
     id: user.id,
     email: user.email,
+    username: user.username || null,
     fullName: user.fullName,
     role: user.role,
   })

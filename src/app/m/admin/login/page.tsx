@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, Lock, Mail, ArrowLeft, AlertCircle, RotateCw } from 'lucide-react';
+import { Landmark, Lock, Mail, ArrowLeft, AlertCircle, RotateCw, User } from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 
 function MobileLoginForm() {
@@ -25,7 +25,7 @@ function MobileLoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: email, password }),
       });
 
       const data = await res.json();
@@ -73,16 +73,18 @@ function MobileLoginForm() {
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
               <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                อีเมลผู้ดูแลระบบ
+                ชื่อผู้ใช้ หรือ อีเมล
               </label>
               <div className="relative">
-                <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                 <input
-                  type="email"
+                  type="text"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@kmutnb.ac.th"
+                  placeholder="ชื่อผู้ใช้ หรือ email@kmutnb.ac.th"
                   className="w-full bg-slate-900/80 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>

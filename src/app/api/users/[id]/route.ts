@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSessionFromRequest } from '@/lib/auth';
+import { getSessionFromRequest, createSessionToken } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 import { recordAuditLog } from '@/lib/audit';
 
@@ -21,7 +21,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { fullName, role, isActive, password } = body;
+    const { fullName, username, role, isActive, password } = body;
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
@@ -33,6 +33,29 @@ export async function PATCH(
 
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName.trim();
+
+    if (username !== undefined) {
+      const cleanUsername = username ? username.trim().toLowerCase() : null;
+      if (cleanUsername) {
+        if (!/^[a-zA-Z0-9_.-]{3,20}$/.test(cleanUsername)) {
+          return NextResponse.json(
+            { error: 'ชื่อผู้ใช้ต้องมีความยาว 3-20 ตัวอักษร (a-z, 0-9, _, ., -) เท่านั้น' },
+            { status: 400 }
+          );
+        }
+        const duplicate = await prisma.user.findFirst({
+          where: { username: cleanUsername, NOT: { id } },
+        });
+        if (duplicate) {
+          return NextResponse.json(
+            { error: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว กรุณาเลือกชื่ออื่น' },
+            { status: 409 }
+          );
+        }
+      }
+      updateData.username = cleanUsername;
+    }
+
     if (session.role === 'SUPER_ADMIN' && role !== undefined) {
       updateData.role = role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN';
     }
@@ -52,6 +75,7 @@ export async function PATCH(
       select: {
         id: true,
         email: true,
+        username: true,
         fullName: true,
         role: true,
         isActive: true,
@@ -69,7 +93,26 @@ export async function PATCH(
       userId: session.id,
     });
 
-    return NextResponse.json({ success: true, user: updated });
+    const response = NextResponse.json({ success: true, user: updated });
+
+    if (isSelf) {
+      const token = await createSessionToken({
+        id: updated.id,
+        email: updated.email,
+        username: updated.username,
+        fullName: updated.fullName,
+        role: updated.role,
+      });
+      response.cookies.set('admin_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+
+    return response;
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json({ error: 'ไม่สามารถอัปเดตข้อมูลบัญชีได้' }, { status: 500 });

@@ -20,10 +20,12 @@ import {
   UserCheck,
   Sparkles
 } from 'lucide-react';
+import ClaimUsernameModal from '@/components/admin/ClaimUsernameModal';
 
 interface AdminUser {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
 }
@@ -38,9 +40,10 @@ export default function AdminLayout({
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
 
   useEffect(() => {
-    if (pathname === '/admin/login') {
+    if (pathname === '/admin/login' || pathname === '/admin/setup-password') {
       setIsLoading(false);
       return;
     }
@@ -51,6 +54,15 @@ export default function AdminLayout({
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+
+          // Check if username claim prompt is needed
+          const dismissed =
+            typeof window !== 'undefined'
+              ? sessionStorage.getItem('username_prompt_dismissed')
+              : null;
+          if (!data.user?.username && !dismissed) {
+            setIsClaimModalOpen(true);
+          }
         } else {
           router.push('/admin/login');
         }
@@ -74,7 +86,7 @@ export default function AdminLayout({
     }
   };
 
-  if (pathname === '/admin/login') {
+  if (pathname === '/admin/login' || pathname === '/admin/setup-password') {
     return <>{children}</>;
   }
 
@@ -173,7 +185,17 @@ export default function AdminLayout({
             </div>
             <div className="truncate flex-grow">
               <div className="font-semibold text-white text-xs truncate leading-snug">{user.fullName}</div>
-              <div className="flex items-center gap-1 mt-0.5">
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {user.username ? (
+                  <span className="text-[10px] text-orange-400 font-mono font-medium">@{user.username}</span>
+                ) : (
+                  <button
+                    onClick={() => setIsClaimModalOpen(true)}
+                    className="text-[9px] text-amber-400 hover:text-amber-300 font-medium underline cursor-pointer"
+                  >
+                    + ตั้ง Username
+                  </button>
+                )}
                 <span
                   className={`inline-block px-1.5 py-0.2 rounded-md font-bold text-[9px] uppercase tracking-wide ${
                     user.role === 'SUPER_ADMIN'
@@ -250,6 +272,17 @@ export default function AdminLayout({
           {children}
         </div>
       </main>
+
+      {/* First-time Username Claim Modal */}
+      <ClaimUsernameModal
+        isOpen={isClaimModalOpen}
+        userFullName={user?.fullName}
+        onClose={() => setIsClaimModalOpen(false)}
+        onSuccess={(claimedUsername) => {
+          setUser((prev) => (prev ? { ...prev, username: claimedUsername } : null));
+          setIsClaimModalOpen(false);
+        }}
+      />
     </div>
   );
 }

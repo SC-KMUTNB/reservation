@@ -16,15 +16,22 @@ import {
   X,
   AlertTriangle,
   Edit2,
-  Check
+  Check,
+  Send,
+  RefreshCw,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 
 interface AdminUserItem {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   role: 'SUPER_ADMIN' | 'ADMIN';
   isActive: boolean;
+  inviteToken?: string | null;
+  inviteExpiresAt?: string | null;
   createdAt: string;
   _count?: {
     approvedBookings: number;
@@ -44,6 +51,9 @@ export default function AdminUsersPage() {
     password: '',
     role: 'ADMIN',
   });
+
+  const [creationMode, setCreationMode] = useState<'invite' | 'direct'>('invite');
+  const [isResending, setIsResending] = useState<string | null>(null);
 
   const [editFormData, setEditFormData] = useState({
     fullName: '',
@@ -77,16 +87,43 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleResendInvite = async (userId: string, userEmail: string) => {
+    setIsResending(userId);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch(`/api/users/${userId}/resend-invite`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'ไม่สามารถส่งคำเชิญซ้ำได้');
+        return;
+      }
+      setSuccessMsg(data.message || `ส่งคำเชิญใหม่ไปยัง ${userEmail} เรียบร้อยแล้ว`);
+      fetchUsers();
+    } catch {
+      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsResending(null);
+    }
+  };
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
+      const payload = {
+        ...formData,
+        sendInvite: creationMode === 'invite',
+      };
+
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -96,7 +133,7 @@ export default function AdminUsersPage() {
         return;
       }
 
-      setSuccessMsg(`เพิ่มผู้ดูแลระบบ ${data.user.fullName} เรียบร้อยแล้ว`);
+      setSuccessMsg(data.message || `เพิ่มผู้ดูแลระบบ ${data.user.fullName} เรียบร้อยแล้ว`);
       setIsAddModalOpen(false);
       setFormData({
         fullName: '',
@@ -269,7 +306,14 @@ export default function AdminUsersPage() {
                         <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-mono text-[11px]">
                           {u.fullName.slice(0, 1)}
                         </div>
-                        <span>{u.fullName}</span>
+                        <div>
+                          <span>{u.fullName}</span>
+                          {u.username && (
+                            <span className="block text-[10px] text-orange-600 font-mono font-medium">
+                              @{u.username}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -291,15 +335,21 @@ export default function AdminUsersPage() {
                     </td>
 
                     <td className="p-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          u.isActive
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : 'bg-slate-100 text-slate-500 border border-slate-200'
-                        }`}
-                      >
-                        {u.isActive ? 'เปิดใช้งาน' : 'ระงับการใช้งาน'}
-                      </span>
+                      {u.inviteToken ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                          <Clock className="w-3 h-3 text-amber-600" /> รอตั้งรหัสผ่าน
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            u.isActive
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          }`}
+                        >
+                          {u.isActive ? 'เปิดใช้งาน' : 'ระงับการใช้งาน'}
+                        </span>
+                      )}
                     </td>
 
                     <td className="p-3.5 tabular-nums font-mono text-slate-600">
@@ -308,6 +358,21 @@ export default function AdminUsersPage() {
 
                     <td className="p-3.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        {u.inviteToken && (
+                          <button
+                            onClick={() => handleResendInvite(u.id, u.email)}
+                            disabled={isResending === u.id}
+                            className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-xs font-medium transition active-press flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="ส่งอีเมลคำเชิญใหม่ (อายุ 48 ชม.)"
+                          >
+                            {isResending === u.id ? (
+                              <RefreshCw className="w-3 h-3 animate-spin text-orange-600" />
+                            ) : (
+                              <Send className="w-3 h-3 text-orange-600" />
+                            )}
+                            <span>ส่งคำเชิญซ้ำ</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => openEditModal(u)}
                           className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition active-press flex items-center gap-1 cursor-pointer"
@@ -348,6 +413,34 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
+            {/* Creation Mode Switcher */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl mb-4">
+              <button
+                type="button"
+                onClick={() => setCreationMode('invite')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  creationMode === 'invite'
+                    ? 'bg-white text-orange-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>ส่งคำเชิญทางอีเมล (แนะนำ)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode('direct')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  creationMode === 'direct'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>กำหนดรหัสผ่านทันที</span>
+              </button>
+            </div>
+
             <form onSubmit={handleAddUser} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
@@ -373,18 +466,30 @@ export default function AdminUsersPage() {
                 />
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
-                />
-              </div>
+              {creationMode === 'invite' ? (
+                <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3.5 space-y-1">
+                  <div className="flex items-center gap-1.5 text-orange-900 font-bold text-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                    <span>ผู้ใช้จะกำหนดรหัสผ่านด้วยตนเอง</span>
+                  </div>
+                  <p className="text-[11px] text-orange-800/90 leading-relaxed font-light">
+                    ระบบจะจัดส่งอีเมลคำเชิญไปยัง <span className="font-mono font-medium">{formData.email || 'อีเมลที่ระบุ'}</span> พร้อมปุ่มลิงก์ให้ผู้ใช้เข้ามาตั้งรหัสผ่านและชื่อผู้ใช้ด้วยตนเอง (ลิงก์มีอายุ 48 ชั่วโมง)
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+                  <input
+                    type="password"
+                    required={creationMode === 'direct'}
+                    minLength={6}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
@@ -408,9 +513,16 @@ export default function AdminUsersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer"
+                  className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5"
                 >
-                  สร้างบัญชีผู้ใช้
+                  {creationMode === 'invite' ? (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>ส่งคำเชิญและสร้างบัญชี</span>
+                    </>
+                  ) : (
+                    <span>สร้างบัญชีผู้ใช้ทันที</span>
+                  )}
                 </button>
               </div>
             </form>

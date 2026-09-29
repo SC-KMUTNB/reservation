@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, Lock, Mail, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Landmark, Lock, Mail, ArrowLeft, AlertCircle, User } from 'lucide-react';
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   NOT_LINKED: 'บัญชี Google นี้ยังไม่ได้เชื่อมกับบัญชีผู้ดูแลระบบ — กรุณาเข้าสู่ระบบด้วยรหัสผ่านแล้วเชื่อมบัญชีในหน้าโปรไฟล์',
@@ -39,7 +39,7 @@ function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: email, password }),
       });
 
       const data = await res.json();
@@ -95,15 +95,19 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5 text-sm">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">อีเมลผู้ดูแลระบบ</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              ชื่อผู้ใช้ หรือ อีเมลผู้ดูแลระบบ
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="email"
+                type="text"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@kmutnb.ac.th"
+                placeholder="ชื่อผู้ใช้ (เช่น admin_sc) หรืออีเมล"
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-white placeholder-slate-500 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
               />
             </div>
