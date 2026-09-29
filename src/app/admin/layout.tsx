@@ -17,7 +17,8 @@ import {
   ExternalLink,
   ChevronRight,
   Shield,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
 
 interface AdminUser {
@@ -112,6 +113,12 @@ export default function AdminLayout({
       href: '/admin/profile',
       icon: UserCheck,
       desc: 'จัดการบัญชีและเชื่อม Google',
+    },
+    {
+      label: 'บันทึกการอัปเดตระบบ',
+      href: '/admin/changelog',
+      icon: Sparkles,
+      desc: 'ประวัติเวอร์ชัน & การเปลี่ยนแปลง',
     },
     ...(isSuperAdmin
       ? [

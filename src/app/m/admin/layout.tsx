@@ -13,7 +13,8 @@ import {
   Landmark,
   Shield,
   RotateCw,
-  ExternalLink
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 
@@ -141,13 +142,27 @@ export default function MobileAdminLayout({
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            title="ออกจากระบบ"
-            className="text-slate-400 hover:text-red-400 p-1.5 rounded-xl active:bg-slate-800 transition cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-1">
+            <Link
+              href="/m/admin/changelog"
+              title="ประวัติการอัปเดตระบบ"
+              className={`p-1.5 rounded-xl transition cursor-pointer ${
+                pathname === '/m/admin/changelog'
+                  ? 'bg-orange-500/20 text-orange-400'
+                  : 'text-slate-400 hover:text-orange-400 active:bg-slate-800'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              title="ออกจากระบบ"
+              className="text-slate-400 hover:text-red-400 p-1.5 rounded-xl active:bg-slate-800 transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 

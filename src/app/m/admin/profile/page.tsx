@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Shield, Key, Lock, CheckCircle2, AlertCircle, RotateCw } from 'lucide-react';
+import { User, Shield, Key, Lock, CheckCircle2, AlertCircle, RotateCw, Sparkles, ChevronRight } from 'lucide-react';
 
 interface ProfileUser {
   id: string;
@@ -137,6 +138,32 @@ function MobileProfileContent() {
           </div>
         </div>
       </div>
+
+      {/* System Changelog Link Card */}
+      <Link
+        href="/m/admin/changelog"
+        className="block bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-3xl p-4 border border-slate-700/80 shadow-md active:scale-98 transition"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-2xl flex items-center justify-center">
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                <span>บันทึกการอัปเดตระบบ</span>
+                <span className="text-[9px] bg-orange-500 text-white px-1.5 py-0.2 rounded-full font-bold">
+                  Changelog
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                ดูประวัติเวอร์ชันและฟีเจอร์ใหม่
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-400" />
+        </div>
+      </Link>
 
       {/* Change Password Card */}
       <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
