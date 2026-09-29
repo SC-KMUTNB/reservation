@@ -54,8 +54,6 @@ export default function AdminSettingsPage() {
     smtp_user: '',
     smtp_pass: '',
     smtp_from: '',
-    resend_api_key: '',
-    resend_from: '',
     admin_notification_email: '',
     // Google Sheets settings
     google_sheet_sync_mode: 'AUTO',
@@ -74,7 +72,6 @@ export default function AdminSettingsPage() {
 
   // Password visibility states
   const [showSmtpPass, setShowSmtpPass] = useState(false);
-  const [showResendKey, setShowResendKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
 
   // Test Email state
@@ -484,13 +481,11 @@ export default function AdminSettingsPage() {
                 ผู้ให้บริการอีเมล (Active Provider)
               </label>
               <select
-                value={settings.email_provider || 'AUTO'}
+                value={settings.email_provider || 'SMTP'}
                 onChange={(e) => updateField('email_provider', e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
               >
-                <option value="AUTO">AUTO (ตรวจสอบ SMTP ก่อน หากล้มเหลวจะสลับไป Resend)</option>
-                <option value="SMTP">SMTP เท่านั้น (เช่น Gmail, Office365, Mail Server องค์กร)</option>
-                <option value="RESEND">Resend API เท่านั้น (HTTPS REST)</option>
+                <option value="SMTP">SMTP (Google SMTP / Gmail หรือ Mail Server องค์กร)</option>
                 <option value="DISABLED">DISABLED (ปิดระบบแจ้งเตือนทางอีเมล)</option>
               </select>
             </div>
@@ -518,7 +513,7 @@ export default function AdminSettingsPage() {
                 type="email"
                 value={settings.admin_notification_email || ''}
                 onChange={(e) => updateField('admin_notification_email', e.target.value)}
-                placeholder="council-admin@kmutnb.ac.th"
+                placeholder="sc.kmutnb65@gmail.com"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
               />
             </div>
@@ -533,7 +528,7 @@ export default function AdminSettingsPage() {
               ) : settings.email_recipient_target === 'BOOKING_PERSON' ? (
                 <>ระบบจะส่งอีเมลยืนยันคำขอและอัปเดตผลการพิจารณาหา <strong>ผู้ขอจองห้องเท่านั้น</strong> และจะ<strong>ไม่ส่งแจ้งเตือนหาแอดมิน</strong></>
               ) : (
-                <>ระบบจะส่งอีเมลหา <strong>ทั้งแอดมินและผู้ขอจองห้อง</strong> (แจ้งเตือนแอดมินเมื่อมีคำขอใหม่ + ส่งยืนยันและอัปเดตผลการพิจารณาให้ผู้จอง)</>
+                <>ระบบจะส่งอีเมลหา <strong>ทั้งแอดมินและผู้ขอจองห้อง</strong> (แจ้งเตือนแอดมินเมื่อมีคำขอใหม่ + ส่งยืนยันคำขอ และส่งอัปเดตสถานะแบบพร้อมกันในอีเมลฉบับเดียวให้ทั้งสองฝ่าย)</>
               )}
             </span>
           </div>
@@ -542,7 +537,7 @@ export default function AdminSettingsPage() {
           <div className="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
               <Server className="w-4 h-4 text-orange-600" />
-              <span>ตั้งค่า SMTP Server (เช่น mail.kmutnb.ac.th หรือ smtp.gmail.com)</span>
+              <span>ตั้งค่า SMTP Server (Google SMTP: smtp.gmail.com หรือ mail server มหาวิทยาลัย)</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -561,9 +556,9 @@ export default function AdminSettingsPage() {
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Port</label>
                 <input
                   type="number"
-                  value={settings.smtp_port || '587'}
+                  value={settings.smtp_port || '465'}
                   onChange={(e) => updateField('smtp_port', e.target.value)}
-                  placeholder="587"
+                  placeholder="465"
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono"
                 />
               </div>
@@ -571,12 +566,12 @@ export default function AdminSettingsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Username</label>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Username (Gmail / อีเมลผู้ส่ง)</label>
                 <input
                   type="text"
                   value={settings.smtp_user || ''}
                   onChange={(e) => updateField('smtp_user', e.target.value)}
-                  placeholder="council@kmutnb.ac.th"
+                  placeholder="sc.kmutnb65@gmail.com"
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono"
                 />
               </div>
@@ -584,7 +579,7 @@ export default function AdminSettingsPage() {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                    <span>SMTP Password / App Password</span>
+                    <span>SMTP Password / Google App Password</span>
                     <Lock className="w-2.5 h-2.5 text-emerald-600" />
                   </label>
                   <button
@@ -613,7 +608,7 @@ export default function AdminSettingsPage() {
                   type="text"
                   value={settings.smtp_from || ''}
                   onChange={(e) => updateField('smtp_from', e.target.value)}
-                  placeholder='"สภานักศึกษา มจพ." <council@kmutnb.ac.th>'
+                  placeholder='"สภานักศึกษา มจพ." <sc.kmutnb65@gmail.com>'
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
@@ -621,58 +616,13 @@ export default function AdminSettingsPage() {
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">โหมดความปลอดภัย (Secure / TLS)</label>
                 <select
-                  value={settings.smtp_secure || 'false'}
+                  value={settings.smtp_secure || 'true'}
                   onChange={(e) => updateField('smtp_secure', e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="false">STARTTLS (พอร์ต 587 แนะนำทั่วไป)</option>
-                  <option value="true">SSL/TLS ตรง (พอร์ต 465)</option>
+                  <option value="true">SSL/TLS ตรง (พอร์ต 465 - แนะนำสำหรับ Gmail)</option>
+                  <option value="false">STARTTLS (พอร์ต 587)</option>
                 </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Sub-card: Resend Configuration */}
-          <div className="bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-              <Sparkles className="w-4 h-4 text-orange-600" />
-              <span>ตั้งค่า Resend API (ทางเลือกสำรอง / รวดเร็ว)</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                    <span>Resend API Key</span>
-                    <Lock className="w-2.5 h-2.5 text-emerald-600" />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowResendKey(!showResendKey)}
-                    className="text-[10px] text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
-                  >
-                    {showResendKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    <span>{showResendKey ? 'ซ่อน' : 'แสดง'}</span>
-                  </button>
-                </div>
-                <input
-                  type={showResendKey ? 'text' : 'password'}
-                  value={settings.resend_api_key || ''}
-                  onChange={(e) => updateField('resend_api_key', e.target.value)}
-                  placeholder="re_••••••••••••••••"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Resend From Address</label>
-                <input
-                  type="text"
-                  value={settings.resend_from || ''}
-                  onChange={(e) => updateField('resend_from', e.target.value)}
-                  placeholder="สภานักศึกษา มจพ. <onboarding@resend.dev>"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                />
               </div>
             </div>
           </div>

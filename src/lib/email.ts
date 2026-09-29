@@ -1,9 +1,12 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 import { decryptSecret } from './encryption';
+import { recordAuditLog } from './audit';
+
+export type EmailRecipient = string | { name: string; address: string };
 
 export interface EmailOptions {
-  to: string | string[];
+  to: EmailRecipient | EmailRecipient[];
   subject: string;
   html: string;
   text?: string;
@@ -12,7 +15,7 @@ export interface EmailOptions {
 export type EmailRecipientTarget = 'BOTH' | 'ADMIN_ONLY' | 'BOOKING_PERSON';
 
 export interface EmailConfig {
-  provider: 'DISABLED' | 'SMTP' | 'RESEND' | 'AUTO';
+  provider: 'DISABLED' | 'SMTP' | 'AUTO';
   recipientTarget: EmailRecipientTarget;
   smtpHost?: string;
   smtpPort?: number;
@@ -20,8 +23,6 @@ export interface EmailConfig {
   smtpUser?: string;
   smtpPass?: string;
   smtpFrom?: string;
-  resendApiKey?: string;
-  resendFrom?: string;
   adminEmail?: string;
 }
 
@@ -44,8 +45,6 @@ export async function getEmailConfig(): Promise<EmailConfig> {
             'smtp_user',
             'smtp_pass',
             'smtp_from',
-            'resend_api_key',
-            'resend_from',
             'admin_notification_email',
             'contact_email',
           ],
@@ -59,40 +58,34 @@ export async function getEmailConfig(): Promise<EmailConfig> {
     console.warn('Could not read email settings from DB, using env fallback:', err);
   }
 
-  const rawProvider = (settingsMap['email_provider'] || process.env.EMAIL_PROVIDER || 'AUTO').toUpperCase();
-  const provider = (['DISABLED', 'SMTP', 'RESEND', 'AUTO'].includes(rawProvider)
+  const rawProvider = (settingsMap['email_provider'] || process.env.EMAIL_PROVIDER || 'SMTP').toUpperCase();
+  const provider = (['DISABLED', 'SMTP', 'AUTO'].includes(rawProvider)
     ? rawProvider
-    : 'AUTO') as EmailConfig['provider'];
+    : 'SMTP') as EmailConfig['provider'];
 
   const rawRecipientTarget = (settingsMap['email_recipient_target'] || process.env.EMAIL_RECIPIENT_TARGET || 'BOTH').toUpperCase();
   const recipientTarget: EmailRecipientTarget = (['BOTH', 'ADMIN_ONLY', 'BOOKING_PERSON'].includes(rawRecipientTarget)
     ? rawRecipientTarget
     : 'BOTH') as EmailRecipientTarget;
 
-  const smtpHost = settingsMap['smtp_host'] || process.env.SMTP_HOST || '';
-  const smtpPort = parseInt(settingsMap['smtp_port'] || process.env.SMTP_PORT || '587', 10);
+  const smtpHost = settingsMap['smtp_host'] || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = parseInt(settingsMap['smtp_port'] || process.env.SMTP_PORT || '465', 10);
   const smtpSecure =
     settingsMap['smtp_secure'] === 'true' ||
     process.env.SMTP_SECURE === 'true' ||
     smtpPort === 465;
-  const smtpUser = settingsMap['smtp_user'] || process.env.SMTP_USER || '';
+  const smtpUser = settingsMap['smtp_user'] || process.env.SMTP_USER || 'sc.kmutnb65@gmail.com';
   const smtpPass = decryptSecret(settingsMap['smtp_pass'] || '') || process.env.SMTP_PASS || '';
   const smtpFrom =
     settingsMap['smtp_from'] ||
     process.env.SMTP_FROM ||
-    `"สภานักศึกษา มจพ." <${smtpUser || 'council@kmutnb.ac.th'}>`;
-
-  const resendApiKey = decryptSecret(settingsMap['resend_api_key'] || '') || process.env.RESEND_API_KEY || '';
-  const resendFrom =
-    settingsMap['resend_from'] ||
-    process.env.RESEND_FROM ||
-    'สภานักศึกษา มจพ. <onboarding@resend.dev>';
+    `"สภานักศึกษา มจพ." <${smtpUser || 'sc.kmutnb65@gmail.com'}>`;
 
   const adminEmail =
     settingsMap['admin_notification_email'] ||
     process.env.ADMIN_NOTIFICATION_EMAIL ||
     settingsMap['contact_email'] ||
-    'council@kmutnb.ac.th';
+    'sc.kmutnb65@gmail.com';
 
   return {
     provider,
@@ -103,8 +96,6 @@ export async function getEmailConfig(): Promise<EmailConfig> {
     smtpUser,
     smtpPass,
     smtpFrom,
-    resendApiKey,
-    resendFrom,
     adminEmail,
   };
 }
@@ -127,19 +118,22 @@ async function sendViaSmtp(options: EmailOptions, config: EmailConfig): Promise<
     throw new Error('SMTP credentials are not fully configured');
   }
 
+  // Remove whitespace from app passwords if present (e.g. Google App Password "wlnm rdto hupq mxau")
+  const cleanPass = config.smtpPass.replace(/\s+/g, '');
+
   const transporter = nodemailer.createTransport({
     host: config.smtpHost,
     port: config.smtpPort,
     secure: config.smtpSecure,
     auth: {
       user: config.smtpUser,
-      pass: config.smtpPass,
+      pass: cleanPass,
     },
   });
 
   await transporter.sendMail({
     from: config.smtpFrom,
-    to: options.to,
+    to: options.to as any,
     subject: options.subject,
     text: options.text || options.html.replace(/<[^>]+>/g, ''),
     html: options.html,
@@ -149,39 +143,7 @@ async function sendViaSmtp(options: EmailOptions, config: EmailConfig): Promise<
 }
 
 /**
- * Send email via Resend API (Direct HTTP request)
- */
-async function sendViaResend(options: EmailOptions, config: EmailConfig): Promise<boolean> {
-  if (!config.resendApiKey) {
-    throw new Error('Resend API Key is not configured');
-  }
-
-  const toList = Array.isArray(options.to) ? options.to : [options.to];
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: config.resendFrom,
-      to: toList,
-      subject: options.subject,
-      html: options.html,
-      text: options.text || options.html.replace(/<[^>]+>/g, ''),
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Resend API error (${response.status}): ${errorBody}`);
-  }
-
-  return true;
-}
-
-/**
- * Core dispatch function with graceful fallback between SMTP and Resend.
+ * Core dispatch function using Google / standard SMTP
  */
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; provider?: string; error?: string }> {
   try {
@@ -192,43 +154,12 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     }
 
     const hasSmtp = Boolean(config.smtpHost && config.smtpUser && config.smtpPass);
-    const hasResend = Boolean(config.resendApiKey);
-
-    if (!hasSmtp && !hasResend) {
-      // Cleanly skip when no email provider is configured
+    if (!hasSmtp) {
       return { success: true, provider: 'UNCONFIGURED' };
     }
 
-    // Determine initial attempt order
-    const trySmtpFirst =
-      config.provider === 'SMTP' ||
-      (config.provider === 'AUTO' && hasSmtp);
-
-    if (trySmtpFirst) {
-      try {
-        await sendViaSmtp(options, config);
-        return { success: true, provider: 'SMTP' };
-      } catch (smtpErr) {
-        console.warn('SMTP delivery failed, attempting fallback to Resend if available:', smtpErr);
-        if (hasResend) {
-          await sendViaResend(options, config);
-          return { success: true, provider: 'RESEND' };
-        }
-        throw smtpErr;
-      }
-    } else {
-      try {
-        await sendViaResend(options, config);
-        return { success: true, provider: 'RESEND' };
-      } catch (resendErr) {
-        console.warn('Resend delivery failed, attempting fallback to SMTP if available:', resendErr);
-        if (hasSmtp) {
-          await sendViaSmtp(options, config);
-          return { success: true, provider: 'SMTP' };
-        }
-        throw resendErr;
-      }
-    }
+    await sendViaSmtp(options, config);
+    return { success: true, provider: 'SMTP' };
   } catch (error: any) {
     console.error('Email sending failed:', error);
     return { success: false, error: error.message || 'Unknown email error' };
@@ -349,11 +280,33 @@ export async function notifyAdminNewBooking(booking: {
     `
   );
 
-  return sendEmail({
-    to: config.adminEmail || 'council@kmutnb.ac.th',
+  const res = await sendEmail({
+    to: {
+      name: 'ผู้ดูแลระบบ สภานักศึกษา',
+      address: config.adminEmail || 'sc.kmutnb65@gmail.com',
+    },
     subject: `[คำขอจองห้องประชุมใหม่] ${booking.bookingCode} - ${booking.fullName} (${booking.date})`,
     html,
   });
+
+  if (!res.success) {
+    console.error(`Admin notification email failed (${config.adminEmail}):`, res.error);
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERY_FAILED',
+      details: `ส่งอีเมลแจ้งเตือนแอดมินล้มเหลว (${config.adminEmail}) รหัส ${booking.bookingCode}: ${res.error}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  } else if (res.provider && res.provider !== 'DISABLED' && res.provider !== 'UNCONFIGURED') {
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERED',
+      details: `ส่งอีเมลแจ้งเตือนคำขอใหม่ ${booking.bookingCode} ไปยังแอดมิน (${config.adminEmail}) สำเร็จ ผ่าน ${res.provider}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  }
+
+  return res;
 }
 
 /**
@@ -421,15 +374,39 @@ export async function notifyUserBookingReceived(booking: {
     `
   );
 
-  return sendEmail({
-    to: booking.email,
+  const res = await sendEmail({
+    to: {
+      name: booking.fullName,
+      address: booking.email,
+    },
     subject: `[สภานักศึกษา มจพ.] ได้รับคำขอจองห้องประชุมแล้ว - ${booking.bookingCode}`,
     html,
   });
+
+  if (!res.success) {
+    console.error(`User booking confirmation email failed (${booking.email}):`, res.error);
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERY_FAILED',
+      details: `ส่งอีเมลแจ้งเตือนผู้จองล้มเหลว (${booking.email}) รหัส ${booking.bookingCode}: ${res.error}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  } else if (res.provider && res.provider !== 'DISABLED' && res.provider !== 'UNCONFIGURED') {
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERED',
+      details: `ส่งอีเมลยืนยันคำขอไปยังผู้จองสำเร็จ (${booking.email}) รหัส ${booking.bookingCode} ผ่าน ${res.provider}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  }
+
+  return res;
 }
 
 /**
- * 3. Notify user when booking status changes (Approved, Rejected, Cancelled).
+ * 3. Notify user and admin when booking status changes (Approved, Rejected, Cancelled).
+ * Sends a single email with BOTH Booker and Admin as recipients in the format:
+ * [ { name: "...", address: "..." }, { name: "...", address: "..." } ]
  */
 export async function notifyUserBookingStatusUpdate(booking: {
   bookingCode: string;
@@ -442,7 +419,34 @@ export async function notifyUserBookingStatusUpdate(booking: {
   rejectionReason?: string | null;
 }) {
   const config = await getEmailConfig();
-  if (!shouldNotifyUser(config)) {
+  if (config.provider === 'DISABLED') {
+    return { success: true, provider: 'DISABLED' };
+  }
+
+  // Build combined recipients list (Booker and Admin in one email)
+  const recipients: Array<{ name: string; address: string }> = [];
+
+  if (shouldNotifyUser(config) && booking.email) {
+    recipients.push({
+      name: booking.fullName || 'ผู้ขอใช้บริการ',
+      address: booking.email.trim(),
+    });
+  }
+
+  if (shouldNotifyAdmin(config) && config.adminEmail) {
+    const adminAddr = config.adminEmail.trim();
+    const alreadyPresent = recipients.some(
+      (r) => r.address.toLowerCase() === adminAddr.toLowerCase()
+    );
+    if (!alreadyPresent) {
+      recipients.push({
+        name: 'ผู้ดูแลระบบ สภานักศึกษา',
+        address: adminAddr,
+      });
+    }
+  }
+
+  if (recipients.length === 0) {
     return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
   }
 
@@ -512,9 +516,30 @@ export async function notifyUserBookingStatusUpdate(booking: {
     `
   );
 
-  return sendEmail({
-    to: booking.email,
+  const res = await sendEmail({
+    to: recipients,
     subject: `[อัปเดตสถานะ] คำขอจองห้องประชุม ${booking.bookingCode} - ${booking.status}`,
     html,
   });
+
+  const recipientsSummary = recipients.map((r) => `${r.name} <${r.address}>`).join(', ');
+
+  if (!res.success) {
+    console.error(`Status update email failed (${recipientsSummary}):`, res.error);
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERY_FAILED',
+      details: `ส่งอีเมลอัปเดตสถานะ (${booking.status}) ไปยัง ${recipientsSummary} ล้มเหลว รหัส ${booking.bookingCode}: ${res.error}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  } else if (res.provider && res.provider !== 'DISABLED' && res.provider !== 'UNCONFIGURED') {
+    await recordAuditLog({
+      action: 'EMAIL_DELIVERED',
+      details: `ส่งอีเมลอัปเดตสถานะ (${booking.status}) ไปยัง ${recipientsSummary} สำเร็จ รหัส ${booking.bookingCode} ผ่าน ${res.provider}`,
+      actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+      actorRole: 'SYSTEM',
+    });
+  }
+
+  return res;
 }

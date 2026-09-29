@@ -83,6 +83,5 @@ export function maskSecret(value?: string | null): string {
  */
 export const SENSITIVE_SETTING_KEYS = [
   'smtp_pass',
-  'resend_api_key',
   'google_private_key',
 ];
