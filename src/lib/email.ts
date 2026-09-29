@@ -323,7 +323,34 @@ export async function notifyUserBookingReceived(booking: {
   reason: string;
 }) {
   const config = await getEmailConfig();
-  if (!shouldNotifyUser(config)) {
+  if (config.provider === 'DISABLED') {
+    return { success: true, provider: 'DISABLED' };
+  }
+
+  // Build combined recipients list (Booker and Admin)
+  const recipients: Array<{ name: string; address: string }> = [];
+
+  if (shouldNotifyUser(config) && booking.email) {
+    recipients.push({
+      name: booking.fullName || 'ผู้ขอใช้บริการ',
+      address: booking.email.trim(),
+    });
+  }
+
+  if (shouldNotifyAdmin(config) && config.adminEmail) {
+    const adminAddr = config.adminEmail.trim();
+    const alreadyPresent = recipients.some(
+      (r) => r.address.toLowerCase() === adminAddr.toLowerCase()
+    );
+    if (!alreadyPresent) {
+      recipients.push({
+        name: 'ผู้ดูแลระบบ สภานักศึกษา',
+        address: adminAddr,
+      });
+    }
+  }
+
+  if (recipients.length === 0) {
     return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
   }
 
@@ -375,26 +402,25 @@ export async function notifyUserBookingReceived(booking: {
   );
 
   const res = await sendEmail({
-    to: {
-      name: booking.fullName,
-      address: booking.email,
-    },
+    to: recipients,
     subject: `[สภานักศึกษา มจพ.] ได้รับคำขอจองห้องประชุมแล้ว - ${booking.bookingCode}`,
     html,
   });
 
+  const recipientsSummary = recipients.map((r) => `${r.name} <${r.address}>`).join(', ');
+
   if (!res.success) {
-    console.error(`User booking confirmation email failed (${booking.email}):`, res.error);
+    console.error(`User booking confirmation email failed (${recipientsSummary}):`, res.error);
     await recordAuditLog({
       action: 'EMAIL_DELIVERY_FAILED',
-      details: `ส่งอีเมลแจ้งเตือนผู้จองล้มเหลว (${booking.email}) รหัส ${booking.bookingCode}: ${res.error}`,
+      details: `ส่งอีเมลแจ้งเตือนผู้จองล้มเหลว (${recipientsSummary}) รหัส ${booking.bookingCode}: ${res.error}`,
       actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
       actorRole: 'SYSTEM',
     });
   } else if (res.provider && res.provider !== 'DISABLED' && res.provider !== 'UNCONFIGURED') {
     await recordAuditLog({
       action: 'EMAIL_DELIVERED',
-      details: `ส่งอีเมลยืนยันคำขอไปยังผู้จองสำเร็จ (${booking.email}) รหัส ${booking.bookingCode} ผ่าน ${res.provider}`,
+      details: `ส่งอีเมลยืนยันคำขอไปยัง ${recipientsSummary} สำเร็จ รหัส ${booking.bookingCode} ผ่าน ${res.provider}`,
       actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
       actorRole: 'SYSTEM',
     });

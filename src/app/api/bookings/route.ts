@@ -177,10 +177,12 @@ export async function POST(request: NextRequest) {
       bookingId: result.id,
     });
 
-    // Asynchronously dispatch notifications and sheet sync (non-blocking)
-    notifyAdminNewBooking(result).catch((err) => console.error('Admin email notify failed:', err));
-    notifyUserBookingReceived(result).catch((err) => console.error('User email notify failed:', err));
-    syncBookingToGoogleSheet(result, 'CREATE').catch((err) => console.error('Google Sheet sync failed:', err));
+    // Dispatch notifications and sheet sync in parallel, awaiting completion to ensure delivery before response finishes
+    await Promise.allSettled([
+      notifyAdminNewBooking(result).catch((err) => console.error('Admin email notify failed:', err)),
+      notifyUserBookingReceived(result).catch((err) => console.error('User email notify failed:', err)),
+      syncBookingToGoogleSheet(result, 'CREATE').catch((err) => console.error('Google Sheet sync failed:', err)),
+    ]);
 
     return NextResponse.json({
       success: true,
