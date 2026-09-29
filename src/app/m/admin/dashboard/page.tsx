@@ -14,11 +14,13 @@ import {
   Building,
   RotateCw,
   AlertTriangle,
-  RotateCcw,
   AlertCircle,
   ChevronRight,
-  Filter
+  Filter,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
 } from 'lucide-react';
+import { formatDisplayDate, getSearchableDateVariants } from '@/lib/date-utils';
 
 interface AdminBooking {
   id: string;
@@ -55,6 +57,7 @@ export default function MobileAdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Action states
   const [rejectingBooking, setRejectingBooking] = useState<AdminBooking | null>(null);
@@ -65,8 +68,22 @@ export default function MobileAdminDashboardPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
+    const saved = localStorage.getItem('admin_dashboard_sort_order');
+    if (saved === 'asc' || saved === 'desc') {
+      setSortOrder(saved);
+    }
     fetchBookings();
   }, []);
+
+  const handleSetSortOrder = (newOrder: 'desc' | 'asc') => {
+    setSortOrder(newOrder);
+    localStorage.setItem('admin_dashboard_sort_order', newOrder);
+  };
+
+  const toggleSortOrder = () => {
+    const next = sortOrder === 'desc' ? 'asc' : 'desc';
+    handleSetSortOrder(next);
+  };
 
   useEffect(() => {
     let result = [...bookings];
@@ -77,18 +94,35 @@ export default function MobileAdminDashboardPage() {
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (b) =>
+      result = result.filter((b) => {
+        const dateVariants = getSearchableDateVariants(b.date);
+        const matchesDate = dateVariants.some((v) => v.includes(q));
+        return (
           b.fullName.toLowerCase().includes(q) ||
           b.studentId.toLowerCase().includes(q) ||
           b.bookingCode.toLowerCase().includes(q) ||
           b.department.toLowerCase().includes(q) ||
-          b.date.includes(q)
-      );
+          matchesDate
+        );
+      });
     }
 
+    // Sort by date (desc / asc), then startTime asc, then createdAt desc
+    result.sort((a, b) => {
+      const dateComparison =
+        sortOrder === 'desc'
+          ? b.date.localeCompare(a.date)
+          : a.date.localeCompare(b.date);
+      if (dateComparison !== 0) return dateComparison;
+
+      const timeComparison = a.startTime.localeCompare(b.startTime);
+      if (timeComparison !== 0) return timeComparison;
+
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
     setFilteredBookings(result);
-  }, [bookings, statusFilter, searchQuery]);
+  }, [bookings, statusFilter, searchQuery, sortOrder]);
 
   const fetchBookings = async () => {
     setIsLoading(true);
@@ -198,15 +232,37 @@ export default function MobileAdminDashboardPage() {
 
       {/* Search & Status Filter */}
       <div className="space-y-2">
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหาชื่อ, รหัสนักศึกษา, รหัสจอง..."
-            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-orange-500 shadow-2xs"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-grow">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาชื่อ, รหัส, ว/ด/ป (02-10-2569)..."
+              className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-orange-500 shadow-2xs"
+            />
+          </div>
+
+          {/* Sort Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleSortOrder}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs hover:bg-slate-50 active:scale-95 transition shrink-0 cursor-pointer"
+            title="สลับการเรียงลำดับวันที่ (ใหม่สุด / เก่าสุด)"
+          >
+            {sortOrder === 'desc' ? (
+              <>
+                <ArrowDownWideNarrow className="w-3.5 h-3.5 text-orange-600" />
+                <span className="text-[11px] font-bold text-orange-600">ใหม่สุด</span>
+              </>
+            ) : (
+              <>
+                <ArrowUpNarrowWide className="w-3.5 h-3.5 text-orange-600" />
+                <span className="text-[11px] font-bold text-orange-600">เก่าสุด</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Filter Chips */}
@@ -291,7 +347,7 @@ export default function MobileAdminDashboardPage() {
 
                   <div className="flex items-center gap-2 text-slate-700 pt-0.5">
                     <Calendar className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                    <span>{b.date}</span>
+                    <span>{formatDisplayDate(b.date)}</span>
                     <span className="text-slate-300">|</span>
                     <Clock className="w-3.5 h-3.5 text-orange-600 shrink-0" />
                     <span className="font-mono">{b.startTime} - {b.endTime} น.</span>
@@ -460,7 +516,7 @@ export default function MobileAdminDashboardPage() {
 
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block">วันและเวลา</span>
-                <span className="font-semibold">{detailsBooking.date} เวลา {detailsBooking.startTime} - {detailsBooking.endTime} น.</span>
+                <span className="font-semibold">{formatDisplayDate(detailsBooking.date)} เวลา {detailsBooking.startTime} - {detailsBooking.endTime} น.</span>
               </div>
 
               <div>

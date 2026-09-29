@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Info
 } from 'lucide-react';
+import { formatDisplayDate } from '@/lib/date-utils';
 
 export default function AdminReportsPage() {
   const [startDate, setStartDate] = useState('');
@@ -641,7 +642,7 @@ export default function AdminReportsPage() {
                               {item.fullName}
                             </td>
                             <td className="py-2 px-3 text-slate-600 font-mono text-[11px]">
-                              {item.date}
+                              {formatDisplayDate(item.date)}
                             </td>
                             <td className="py-2 px-3 text-slate-600 font-mono text-[11px]">
                               {item.startTime} - {item.endTime}
