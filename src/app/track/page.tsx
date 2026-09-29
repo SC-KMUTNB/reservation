@@ -22,6 +22,7 @@ import {
   Building,
   Lock
 } from 'lucide-react';
+import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 
 interface BookingTrackItem {
   id: string;
@@ -327,6 +328,7 @@ function TrackContent() {
           </div>
         )}
       </main>
+      <ViewSwitcherFooter currentMode="desktop" />
     </div>
   );
 }

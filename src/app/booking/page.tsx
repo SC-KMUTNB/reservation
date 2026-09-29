@@ -27,6 +27,7 @@ import {
   Hash,
   Sparkles
 } from 'lucide-react';
+import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 
 interface BookingItem {
   id: string;
@@ -924,6 +925,7 @@ export default function BookingPage() {
           </div>
         </div>
       </footer>
+      <ViewSwitcherFooter currentMode="desktop" />
     </div>
   );
 }

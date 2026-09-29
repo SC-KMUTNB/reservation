@@ -1,0 +1,221 @@
+'use client';
+
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { User, Shield, Key, Lock, CheckCircle2, AlertCircle, RotateCw } from 'lucide-react';
+
+interface ProfileUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: 'SUPER_ADMIN' | 'ADMIN';
+  isGoogleLinked: boolean;
+  googleEmail?: string | null;
+}
+
+function MobileProfileContent() {
+  const router = useRouter();
+  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Form states
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      } else {
+        router.push('/m/admin/login');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessMsg(null);
+    setErrorMsg(null);
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMsg('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const res = await fetch(`/api/users/${user?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: newPassword,
+          currentPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || 'เปลี่ยนรหัสผ่านไม่สำเร็จ');
+        return;
+      }
+
+      setSuccessMsg('เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e) {
+      console.error(e);
+      setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center text-xs text-slate-500">
+        <RotateCw className="w-6 h-6 text-orange-600 animate-spin mx-auto mb-2" />
+        <span>กำลังโหลดข้อมูลโปรไฟล์...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div>
+        <h2 className="text-base font-bold text-slate-900">โปรไฟล์ผู้ดูแลระบบ</h2>
+        <p className="text-xs text-slate-500">จัดการข้อมูลบัญชีผู้ใช้และความปลอดภัย</p>
+      </div>
+
+      {successMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-2xl flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-2xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Account Info Card */}
+      <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center font-bold text-lg">
+            <User className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm text-slate-800">{user?.fullName}</h3>
+            <p className="text-xs text-slate-500 font-mono">{user?.email}</p>
+            <span className="inline-block mt-1 text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">
+              {user?.role === 'SUPER_ADMIN' ? 'Super Admin (สิทธิ์สูงสุด)' : 'Admin (เจ้าหน้าที่)'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Change Password Card */}
+      <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+          <Key className="w-4 h-4 text-orange-600" />
+          <span>เปลี่ยนรหัสผ่านบัญชี</span>
+        </div>
+
+        <form onSubmit={handlePasswordChange} className="space-y-3 text-xs">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              รหัสผ่านปัจจุบัน
+            </label>
+            <input
+              type="password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)
+            </label>
+            <input
+              type="password"
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              ยืนยันรหัสผ่านใหม่
+            </label>
+            <input
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isUpdatingPassword}
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-xl text-xs active:scale-98 transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+          >
+            {isUpdatingPassword ? (
+              <>
+                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                <span>กำลังบันทึกรหัสผ่านใหม่...</span>
+              </>
+            ) : (
+              <span>บันทึกรหัสผ่านใหม่</span>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function MobileAdminProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-xs text-slate-500">กำลังโหลด...</div>
+      }
+    >
+      <MobileProfileContent />
+    </Suspense>
+  );
+}

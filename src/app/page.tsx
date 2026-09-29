@@ -25,6 +25,7 @@ import {
   Volume2,
   Wifi
 } from 'lucide-react';
+import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 
 export default function HomePage() {
   const router = useRouter();
@@ -414,6 +415,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      <ViewSwitcherFooter currentMode="desktop" />
     </div>
   );
 }
