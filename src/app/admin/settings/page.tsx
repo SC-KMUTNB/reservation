@@ -47,6 +47,7 @@ export default function AdminSettingsPage() {
     contact_phone: '',
     // Email settings
     email_provider: 'AUTO',
+    email_recipient_target: 'BOTH',
     smtp_host: '',
     smtp_port: '587',
     smtp_secure: 'false',
@@ -477,7 +478,7 @@ export default function AdminSettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 ผู้ให้บริการอีเมล (Active Provider)
@@ -496,6 +497,21 @@ export default function AdminSettingsPage() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
+                ส่งอีเมลแจ้งเตือนถึง (Send Email To)
+              </label>
+              <select
+                value={settings.email_recipient_target || 'BOTH'}
+                onChange={(e) => updateField('email_recipient_target', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
+              >
+                <option value="BOTH">ทั้งแอดมินและผู้ขอจอง (Both Admin & Booking Person)</option>
+                <option value="ADMIN_ONLY">เฉพาะแอดมินเท่านั้น (Admin Only)</option>
+                <option value="BOOKING_PERSON">เฉพาะผู้ขอจองเท่านั้น (Booking Person Only)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 อีเมลแอดมินสำหรับรับการแจ้งเตือนคำขอใหม่
               </label>
               <input
@@ -506,6 +522,20 @@ export default function AdminSettingsPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
               />
             </div>
+          </div>
+
+          {/* Description badge of current email recipient target */}
+          <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-[11px] text-slate-600 flex items-start gap-2">
+            <span className="font-bold text-orange-600 shrink-0 mt-0.5">ℹ️ นโยบายการส่งอีเมล:</span>
+            <span>
+              {settings.email_recipient_target === 'ADMIN_ONLY' ? (
+                <>ระบบจะส่งแจ้งเตือนหา <strong>แอดมินเท่านั้น</strong> เมื่อมีคำขอใหม่ และจะ<strong>ไม่ส่งอีเมลหาผู้ขอจองห้อง</strong></>
+              ) : settings.email_recipient_target === 'BOOKING_PERSON' ? (
+                <>ระบบจะส่งอีเมลยืนยันคำขอและอัปเดตผลการพิจารณาหา <strong>ผู้ขอจองห้องเท่านั้น</strong> และจะ<strong>ไม่ส่งแจ้งเตือนหาแอดมิน</strong></>
+              ) : (
+                <>ระบบจะส่งอีเมลหา <strong>ทั้งแอดมินและผู้ขอจองห้อง</strong> (แจ้งเตือนแอดมินเมื่อมีคำขอใหม่ + ส่งยืนยันและอัปเดตผลการพิจารณาให้ผู้จอง)</>
+              )}
+            </span>
           </div>
 
           {/* Sub-card: SMTP Configuration */}

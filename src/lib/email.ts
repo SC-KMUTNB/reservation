@@ -9,8 +9,11 @@ export interface EmailOptions {
   text?: string;
 }
 
+export type EmailRecipientTarget = 'BOTH' | 'ADMIN_ONLY' | 'BOOKING_PERSON';
+
 export interface EmailConfig {
   provider: 'DISABLED' | 'SMTP' | 'RESEND' | 'AUTO';
+  recipientTarget: EmailRecipientTarget;
   smtpHost?: string;
   smtpPort?: number;
   smtpSecure?: boolean;
@@ -34,6 +37,7 @@ export async function getEmailConfig(): Promise<EmailConfig> {
         key: {
           in: [
             'email_provider',
+            'email_recipient_target',
             'smtp_host',
             'smtp_port',
             'smtp_secure',
@@ -59,6 +63,11 @@ export async function getEmailConfig(): Promise<EmailConfig> {
   const provider = (['DISABLED', 'SMTP', 'RESEND', 'AUTO'].includes(rawProvider)
     ? rawProvider
     : 'AUTO') as EmailConfig['provider'];
+
+  const rawRecipientTarget = (settingsMap['email_recipient_target'] || process.env.EMAIL_RECIPIENT_TARGET || 'BOTH').toUpperCase();
+  const recipientTarget: EmailRecipientTarget = (['BOTH', 'ADMIN_ONLY', 'BOOKING_PERSON'].includes(rawRecipientTarget)
+    ? rawRecipientTarget
+    : 'BOTH') as EmailRecipientTarget;
 
   const smtpHost = settingsMap['smtp_host'] || process.env.SMTP_HOST || '';
   const smtpPort = parseInt(settingsMap['smtp_port'] || process.env.SMTP_PORT || '587', 10);
@@ -87,6 +96,7 @@ export async function getEmailConfig(): Promise<EmailConfig> {
 
   return {
     provider,
+    recipientTarget,
     smtpHost,
     smtpPort,
     smtpSecure,
@@ -97,6 +107,16 @@ export async function getEmailConfig(): Promise<EmailConfig> {
     resendFrom,
     adminEmail,
   };
+}
+
+export function shouldNotifyAdmin(config: EmailConfig): boolean {
+  if (config.provider === 'DISABLED') return false;
+  return config.recipientTarget === 'BOTH' || config.recipientTarget === 'ADMIN_ONLY';
+}
+
+export function shouldNotifyUser(config: EmailConfig): boolean {
+  if (config.provider === 'DISABLED') return false;
+  return config.recipientTarget === 'BOTH' || config.recipientTarget === 'BOOKING_PERSON';
 }
 
 /**
@@ -277,6 +297,10 @@ export async function notifyAdminNewBooking(booking: {
   reason: string;
 }) {
   const config = await getEmailConfig();
+  if (!shouldNotifyAdmin(config)) {
+    return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
+  }
+
   const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
 
   const html = emailWrapper(
@@ -345,6 +369,11 @@ export async function notifyUserBookingReceived(booking: {
   department: string;
   reason: string;
 }) {
+  const config = await getEmailConfig();
+  if (!shouldNotifyUser(config)) {
+    return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
+  }
+
   const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
   const trackUrl = `${baseUrl}/track?q=${encodeURIComponent(booking.bookingCode)}`;
 
@@ -412,6 +441,11 @@ export async function notifyUserBookingStatusUpdate(booking: {
   status: 'APPROVED' | 'REJECTED' | 'CANCELLED';
   rejectionReason?: string | null;
 }) {
+  const config = await getEmailConfig();
+  if (!shouldNotifyUser(config)) {
+    return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
+  }
+
   const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
   const trackUrl = `${baseUrl}/track?q=${encodeURIComponent(booking.bookingCode)}`;
 
