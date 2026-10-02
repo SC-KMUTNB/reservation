@@ -372,11 +372,11 @@ export default function MobileBookingPage() {
         </div>
       </div>
 
-      {/* -------------------- Slide-Up Bottom Sheet Form -------------------- */}
+      {/* -------------------- Top Popup Form -------------------- */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex flex-col justify-start p-3 pt-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div
-            className="bg-white w-full max-w-md mx-auto rounded-t-3xl max-h-[85vh] flex flex-col shadow-2xl border-t border-slate-200 overflow-hidden animate-in slide-in-from-bottom duration-300"
+            className="bg-white w-full max-w-md mx-auto rounded-3xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-top duration-300"
           >
             {/* Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
@@ -561,8 +561,8 @@ export default function MobileBookingPage() {
 
       {/* -------------------- Rules Confirmation Bottom Sheet -------------------- */}
       {isRuleSheetOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl p-5 space-y-4 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-50 flex flex-col justify-start p-3 pt-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md mx-auto rounded-3xl max-h-[85vh] overflow-y-auto p-5 space-y-4 shadow-2xl border border-slate-200 animate-in slide-in-from-top duration-300">
             <div className="flex items-center gap-2 text-slate-800">
               <ShieldCheck className="w-5 h-5 text-orange-600" />
               <h3 className="font-bold text-sm">ข้อตกลงและกฎระเบียบการใช้ห้อง</h3>
