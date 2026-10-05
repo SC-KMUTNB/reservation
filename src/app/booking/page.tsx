@@ -939,6 +939,7 @@ export default function BookingPage() {
                 >
                   ตรวจสอบกฎระเบียบและยืนยัน
                 </button>
+              </div>
             </form>
           </div>
         )}
