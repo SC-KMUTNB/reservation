@@ -16,6 +16,7 @@ import {
   Share2,
   Info,
   CalendarCheck,
+  CalendarX,
   ArrowLeft,
   Copy,
   Check,
@@ -28,6 +29,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
+import { getNowInTimezone } from '@/lib/date-utils';
 
 interface BookingItem {
   id: string;
@@ -119,10 +121,13 @@ export default function BookingPage() {
   const formattedMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const bookings = useMemo(() => bookingsByMonth[formattedMonthStr] || [], [bookingsByMonth, formattedMonthStr]);
 
-  const todayStr = useMemo(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  }, []);
+  const nowInTz = useMemo(() => {
+    return getNowInTimezone(settings.timezone);
+  }, [settings.timezone]);
+
+  const todayStr = nowInTz.dateStr;
+  const currentTimeStr = nowInTz.timeStr;
+  const isPastSelectedDate = selectedDate ? selectedDate < todayStr : false;
 
   useEffect(() => {
     fetchSettings();
@@ -193,21 +198,31 @@ export default function BookingPage() {
     setSelectedDate(dateStr);
     setErrorMessage(null);
 
-    // Find the first available slot on that date
-    const dayBookings = bookings.filter(
-      (b) => b.date === dateStr && (b.status === 'APPROVED' || b.status === 'PENDING')
-    );
+    const { dateStr: currentTzDate, timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
+    const isPast = dateStr < currentTzDate;
+    const isToday = dateStr === currentTzDate;
 
-    const firstFreeSlot = OPERATIONAL_SLOTS.find((slot) =>
-      !dayBookings.some((b) => isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime))
-    );
+    if (!isPast) {
+      // Find the first available upcoming slot on that date
+      const dayBookings = bookings.filter(
+        (b) => b.date === dateStr && (b.status === 'APPROVED' || b.status === 'PENDING')
+      );
 
-    if (firstFreeSlot) {
-      setFormData((prev) => ({
-        ...prev,
-        startTime: firstFreeSlot.start,
-        endTime: firstFreeSlot.end,
-      }));
+      const firstFreeSlot = OPERATIONAL_SLOTS.find((slot) => {
+        const isPastSlot = isToday && slot.start <= currentTzTime;
+        const isOccupied = dayBookings.some((b) =>
+          isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
+        );
+        return !isPastSlot && !isOccupied;
+      });
+
+      if (firstFreeSlot) {
+        setFormData((prev) => ({
+          ...prev,
+          startTime: firstFreeSlot.start,
+          endTime: firstFreeSlot.end,
+        }));
+      }
     }
 
     setIsBookingModalOpen(true);
@@ -227,9 +242,19 @@ export default function BookingPage() {
 
   // Real-time conflict detection
   const conflictDetails = useMemo(() => {
+    if (!selectedDate) return null;
+    if (selectedDate < todayStr) {
+      return { type: 'PAST_DATE', message: 'ไม่อนุญาตให้จองย้อนหลัง กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต' };
+    }
+
     if (!formData.startTime || !formData.endTime) return null;
     if (formData.startTime >= formData.endTime) {
       return { type: 'INVALID_ORDER', message: 'เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด' };
+    }
+
+    const { timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
+    if (selectedDate === todayStr && formData.startTime <= currentTzTime) {
+      return { type: 'PAST_TIME', message: 'เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต' };
     }
 
     const conflict = selectedDateBookings.find((b) =>
@@ -245,7 +270,8 @@ export default function BookingPage() {
     }
 
     return null;
-  }, [formData.startTime, formData.endTime, selectedDateBookings]);
+  }, [formData.startTime, formData.endTime, selectedDate, todayStr, selectedDateBookings, settings.timezone]);
+
 
   const handleSelectSlot = (slotStart: string, slotEnd: string) => {
     setFormData((prev) => ({
@@ -502,6 +528,7 @@ export default function BookingPage() {
               const day = i + 1;
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const isToday = dateStr === todayStr;
+              const isPast = dateStr < todayStr;
 
               const dayBookings = bookings.filter((b) => b.date === dateStr);
               const activeBookings = dayBookings.filter(
@@ -515,7 +542,10 @@ export default function BookingPage() {
                 'bg-white hover:border-orange-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800';
               let badgeDot = null;
 
-              if (hasApproved) {
+              if (isPast) {
+                cardStyle =
+                  'bg-slate-100/60 border-slate-200/60 text-slate-400 hover:border-slate-300';
+              } else if (hasApproved) {
                 cardStyle =
                   'bg-emerald-50/40 border-emerald-300 hover:border-emerald-500 hover:shadow-warm-sm text-slate-800';
                 badgeDot = (
@@ -540,6 +570,8 @@ export default function BookingPage() {
                       className={`text-xs md:text-sm font-bold tabular-nums font-mono ${
                         isToday
                           ? 'bg-orange-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-xs -ml-0.5 -mt-0.5'
+                          : isPast
+                          ? 'text-slate-400 font-normal'
                           : 'text-slate-700 group-hover:text-orange-600 transition-colors'
                       }`}
                     >
@@ -550,8 +582,16 @@ export default function BookingPage() {
 
                   <div>
                     {activeBookings.length > 0 ? (
-                      <div className="text-[10px] md:text-[11px] font-semibold text-orange-800 bg-orange-100/80 px-2 py-0.5 rounded-lg inline-block border border-orange-200/60 leading-tight">
+                      <div className={`text-[10px] md:text-[11px] font-semibold px-2 py-0.5 rounded-lg inline-block border leading-tight ${
+                        isPast
+                          ? 'bg-slate-200/70 text-slate-600 border-slate-300/60'
+                          : 'text-orange-800 bg-orange-100/80 border-orange-200/60'
+                      }`}>
                         {activeBookings.length} รายการ
+                      </div>
+                    ) : isPast ? (
+                      <div className="text-[10px] md:text-[11px] text-slate-300 group-hover:text-slate-500 font-medium">
+                        ดูประวัติ
                       </div>
                     ) : (
                       <div className="text-[10px] md:text-[11px] text-slate-300 group-hover:text-orange-600 transition-colors font-medium">
@@ -572,12 +612,25 @@ export default function BookingPage() {
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 md:p-7 shadow-2xl my-8 border border-slate-100 relative">
             <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
               <div>
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/80 mb-1">
-                  <CalendarCheck className="w-3.5 h-3.5" /> แบบฟอร์มขอใช้ห้อง
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                  จองห้องประชุมวันที่ <span className="text-orange-600 font-mono tabular-nums">{selectedDate}</span>
-                </h3>
+                {isPastSelectedDate ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200 mb-1">
+                      <Clock className="w-3.5 h-3.5" /> ประวัติการใช้ห้อง
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                      รายการจองห้องประชุมวันที่ <span className="text-orange-600 font-mono tabular-nums">{selectedDate}</span>
+                    </h3>
+                  </>
+                ) : (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/80 mb-1">
+                      <CalendarCheck className="w-3.5 h-3.5" /> แบบฟอร์มขอใช้ห้อง
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                      จองห้องประชุมวันที่ <span className="text-orange-600 font-mono tabular-nums">{selectedDate}</span>
+                    </h3>
+                  </>
+                )}
               </div>
               <button
                 onClick={closeBookingModal}
@@ -587,97 +640,176 @@ export default function BookingPage() {
               </button>
             </div>
 
-            {/* Existing Active Bookings list */}
-            {selectedDateBookings.length > 0 && (
-              <div className="mb-4 bg-slate-50 p-3.5 rounded-2xl text-xs text-slate-600 border border-slate-200">
-                <span className="font-bold text-slate-700 block mb-2 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" /> ช่วงเวลาที่ถูกจองแล้วในวันนี้ (ไม่สามารถจองซ้อนได้):
-                </span>
-                <div className="space-y-1.5">
-                  {selectedDateBookings.map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex justify-between items-center py-1 border-b border-slate-200/70 last:border-0"
-                    >
-                      <span className="font-mono tabular-nums font-semibold text-slate-800">
-                        {b.startTime} - {b.endTime} น.
-                        <span className="text-slate-500 font-sans font-normal ml-2">
-                          ({b.fullName} • {b.department})
-                        </span>
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          b.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}
-                      >
-                        {b.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
-                      </span>
+            {isPastSelectedDate ? (
+              <div>
+                {/* Past Date Notice */}
+                <div className="mb-4 p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center gap-3 text-slate-700">
+                  <div className="w-10 h-10 rounded-xl bg-slate-200/70 flex items-center justify-center shrink-0 text-slate-500">
+                    <CalendarX className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-slate-800">ไม่อนุญาตให้จองย้อนหลัง</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      วันที่ดังกล่าวได้ผ่านพ้นไปแล้ว สามารถเปิดดูข้อมูลประวัติการจองเดิมได้เท่านั้น
+                    </p>
+                  </div>
+                </div>
+
+                {/* Existing Bookings list for past date */}
+                {selectedDateBookings.length > 0 ? (
+                  <div className="mb-4 bg-slate-50 p-3.5 rounded-2xl text-xs text-slate-600 border border-slate-200">
+                    <span className="font-bold text-slate-700 block mb-2 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" /> รายการจองทั้งหมดในวันนี้:
+                    </span>
+                    <div className="space-y-1.5">
+                      {selectedDateBookings.map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex justify-between items-center py-1 border-b border-slate-200/70 last:border-0"
+                        >
+                          <span className="font-mono tabular-nums font-semibold text-slate-800">
+                            {b.startTime} - {b.endTime} น.
+                            <span className="text-slate-500 font-sans font-normal ml-2">
+                              ({b.fullName} • {b.department})
+                            </span>
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              b.status === 'APPROVED'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}
+                          >
+                            {b.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    ไม่มีรายการจองห้องประชุมในวันนี้
+                  </div>
+                )}
+
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={closeBookingModal}
+                    className="px-5 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition font-medium cursor-pointer text-xs active-press"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
                 </div>
               </div>
-            )}
+            ) : (
+              <div>
+                {/* Existing Active Bookings list */}
+                {selectedDateBookings.length > 0 && (
+                  <div className="mb-4 bg-slate-50 p-3.5 rounded-2xl text-xs text-slate-600 border border-slate-200">
+                    <span className="font-bold text-slate-700 block mb-2 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" /> ช่วงเวลาที่ถูกจองแล้วในวันนี้ (ไม่สามารถจองซ้อนได้):
+                    </span>
+                    <div className="space-y-1.5">
+                      {selectedDateBookings.map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex justify-between items-center py-1 border-b border-slate-200/70 last:border-0"
+                        >
+                          <span className="font-mono tabular-nums font-semibold text-slate-800">
+                            {b.startTime} - {b.endTime} น.
+                            <span className="text-slate-500 font-sans font-normal ml-2">
+                              ({b.fullName} • {b.department})
+                            </span>
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              b.status === 'APPROVED'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}
+                          >
+                            {b.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Interactive Time Slot Selector Grid (08:00 - 20:00) */}
-            <div className="mb-5">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-slate-800">
-                  เลือกช่วงเวลาเปิดใช้งาน (08:00 - 20:00 น.)
-                </label>
-                <span className="text-[11px] text-slate-400">คลิกบล็อกเวลาที่ว่าง</span>
-              </div>
+                {/* Notice if all slots for today have already passed */}
+                {selectedDate === todayStr && OPERATIONAL_SLOTS.every((slot) => slot.start <= currentTimeStr) && (
+                  <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-2xl flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                    <span>รอบเวลาเปิดใช้งานสำหรับวันนี้ผ่านพ้นไปหมดแล้ว กรุณาเลือกวันอื่น</span>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {OPERATIONAL_SLOTS.map((slot) => {
-                  const conflict = selectedDateBookings.find((b) =>
-                    isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
-                  );
+                {/* Interactive Time Slot Selector Grid (08:00 - 20:00) */}
+                <div className="mb-5">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold text-slate-800">
+                      เลือกช่วงเวลาเปิดใช้งาน (08:00 - 20:00 น.)
+                    </label>
+                    <span className="text-[11px] text-slate-400">คลิกบล็อกเวลาที่ว่าง</span>
+                  </div>
 
-                  const isOccupied = !!conflict;
-                  const isSelected =
-                    formData.startTime <= slot.start && formData.endTime >= slot.end;
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {OPERATIONAL_SLOTS.map((slot) => {
+                      const conflict = selectedDateBookings.find((b) =>
+                        isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
+                      );
 
-                  let slotClass =
-                    'border border-slate-200 bg-white hover:border-orange-500 hover:bg-orange-50/50 text-slate-700 cursor-pointer shadow-2xs';
+                      const isOccupied = !!conflict;
+                      const isPastSlot = selectedDate === todayStr && slot.start <= currentTimeStr;
+                      const isSelected =
+                        formData.startTime <= slot.start && formData.endTime >= slot.end;
 
-                  if (isOccupied) {
-                    if (conflict?.status === 'APPROVED') {
-                      slotClass =
-                        'border-emerald-200/80 bg-emerald-50/60 text-emerald-800 cursor-not-allowed opacity-75';
-                    } else {
-                      slotClass =
-                        'border-amber-200/80 bg-amber-50/60 text-amber-800 cursor-not-allowed opacity-75';
-                    }
-                  } else if (isSelected) {
-                    slotClass =
-                      'border-orange-600 bg-orange-600 text-white shadow-warm-xs font-bold';
-                  }
+                      let slotClass =
+                        'border border-slate-200 bg-white hover:border-orange-500 hover:bg-orange-50/50 text-slate-700 cursor-pointer shadow-2xs';
 
-                  return (
-                    <button
-                      key={slot.label}
-                      type="button"
-                      disabled={isOccupied}
-                      onClick={() => handleSelectSlot(slot.start, slot.end)}
-                      className={`p-2 rounded-xl text-center text-xs transition active-press flex flex-col items-center justify-center min-h-[52px] ${slotClass}`}
-                    >
-                      <span className="font-mono tabular-nums text-xs">{slot.label}</span>
-                      <span className="text-[10px] mt-0.5">
-                        {isOccupied
-                          ? conflict?.status === 'APPROVED'
-                            ? 'อนุมัติแล้ว'
-                            : 'รอตรวจสอบ'
-                          : isSelected
-                          ? '✓ เลือกอยู่'
-                          : 'ว่าง'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      if (isPastSlot) {
+                        slotClass =
+                          'border-slate-200/80 bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60';
+                      } else if (isOccupied) {
+                        if (conflict?.status === 'APPROVED') {
+                          slotClass =
+                            'border-emerald-200/80 bg-emerald-50/60 text-emerald-800 cursor-not-allowed opacity-75';
+                        } else {
+                          slotClass =
+                            'border-amber-200/80 bg-amber-50/60 text-amber-800 cursor-not-allowed opacity-75';
+                        }
+                      } else if (isSelected) {
+                        slotClass =
+                          'border-orange-600 bg-orange-600 text-white shadow-warm-xs font-bold';
+                      }
+
+                      return (
+                        <button
+                          key={slot.label}
+                          type="button"
+                          disabled={isOccupied || isPastSlot}
+                          onClick={() => handleSelectSlot(slot.start, slot.end)}
+                          className={`p-2 rounded-xl text-center text-xs transition active-press flex flex-col items-center justify-center min-h-[52px] ${slotClass}`}
+                        >
+                          <span className="font-mono tabular-nums text-xs">{slot.label}</span>
+                          <span className="text-[10px] mt-0.5">
+                            {isPastSlot
+                              ? 'เลยเวลาแล้ว'
+                              : isOccupied
+                              ? conflict?.status === 'APPROVED'
+                                ? 'อนุมัติแล้ว'
+                                : 'รอตรวจสอบ'
+                              : isSelected
+                              ? '✓ เลือกอยู่'
+                              : 'ว่าง'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
 
             {/* Error or Conflict Alert Banner */}
             {conflictDetails && (
@@ -807,11 +939,12 @@ export default function BookingPage() {
                 >
                   ตรวจสอบกฎระเบียบและยืนยัน
                 </button>
-              </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  )}
 
       {/* Rules Modal */}
       {isRuleModalOpen && (

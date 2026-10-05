@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/auth';
 import ExcelJS from 'exceljs';
-
-const DEFAULT_TIMEZONE = 'Asia/Bangkok';
-
-function resolveTimezone(timezone?: string | null): string {
-  const value = timezone?.trim() || DEFAULT_TIMEZONE;
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
-    return value;
-  } catch {
-    return DEFAULT_TIMEZONE;
-  }
-}
+import { DEFAULT_TIMEZONE, resolveTimezone } from '@/lib/date-utils';
 
 function formatDateTimeInTimezone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

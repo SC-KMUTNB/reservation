@@ -21,10 +21,12 @@ import {
   FileText,
   ShieldCheck,
   Search,
-  Sparkles
+  Sparkles,
+  CalendarX,
 } from 'lucide-react';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
+import { getNowInTimezone } from '@/lib/date-utils';
 
 interface BookingItem {
   id: string;
@@ -71,7 +73,9 @@ function formatDateStr(d: Date): string {
 }
 
 export default function MobileBookingPage() {
-  const [selectedDate, setSelectedDate] = useState<string>(() => formatDateStr(new Date()));
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return getNowInTimezone('Asia/Bangkok').dateStr;
+  });
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -94,13 +98,26 @@ export default function MobileBookingPage() {
     endTime: '11:00',
   });
 
+  const nowInTz = useMemo(() => {
+    return getNowInTimezone(settings.timezone);
+  }, [settings.timezone]);
+
+  const todayStr = nowInTz.dateStr;
+  const currentTimeStr = nowInTz.timeStr;
+  const isPastSelectedDate = selectedDate < todayStr;
+
   const selectedMonthStr = selectedDate.slice(0, 7);
 
   // Fetch settings & bookings for current month
   useEffect(() => {
     fetch('/api/settings')
       .then((r) => r.json())
-      .then((d) => setSettings(d.settings || {}))
+      .then((d) => {
+        const s = d.settings || {};
+        setSettings(s);
+        const { dateStr } = getNowInTimezone(s.timezone);
+        setSelectedDate((prev) => (prev < dateStr ? dateStr : prev));
+      })
       .catch(console.error);
   }, []);
 
@@ -125,18 +142,20 @@ export default function MobileBookingPage() {
     }
   }, [selectedMonthStr, fetchMonthBookings]);
 
-  // Generate 14-day swipeable window centered around today/selected date
+  // Generate 21-day swipeable window starting from today in timezone
   const dateWindow = useMemo(() => {
-    const dates: Date[] = [];
-    const base = new Date();
-    // 14 days starting from today
+    const dates: string[] = [];
+    const parts = todayStr.split('-').map(Number);
+    const y = parts[0] || new Date().getFullYear();
+    const m = (parts[1] || 1) - 1;
+    const d = parts[2] || 1;
+
     for (let i = 0; i < 21; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      dates.push(d);
+      const dt = new Date(y, m, d + i);
+      dates.push(formatDateStr(dt));
     }
     return dates;
-  }, []);
+  }, [todayStr]);
 
   // Filter bookings for the actively selected date
   const dayBookings = useMemo(() => {
@@ -147,9 +166,18 @@ export default function MobileBookingPage() {
 
   // Conflict check for selected times
   const conflictDetails = useMemo(() => {
+    if (selectedDate < todayStr) {
+      return { type: 'PAST_DATE', message: 'ไม่อนุญาตให้จองย้อนหลัง กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต' };
+    }
+
     if (!formData.startTime || !formData.endTime) return null;
     if (formData.startTime >= formData.endTime) {
       return { type: 'INVALID_ORDER', message: 'เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด' };
+    }
+
+    const { timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
+    if (selectedDate === todayStr && formData.startTime <= currentTzTime) {
+      return { type: 'PAST_TIME', message: 'เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต' };
     }
 
     const conflict = dayBookings.find((b) =>
@@ -165,9 +193,15 @@ export default function MobileBookingPage() {
     }
 
     return null;
-  }, [formData.startTime, formData.endTime, dayBookings]);
+  }, [formData.startTime, formData.endTime, dayBookings, selectedDate, todayStr, settings.timezone]);
 
   const handleOpenFormWithSlot = (start: string, end: string) => {
+    if (isPastSelectedDate) return;
+    const { timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
+    if (selectedDate === todayStr && start <= currentTzTime) {
+      setErrorMessage('เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต');
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       startTime: start,
@@ -176,6 +210,7 @@ export default function MobileBookingPage() {
     setErrorMessage(null);
     setIsFormOpen(true);
   };
+
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,6 +293,7 @@ export default function MobileBookingPage() {
           </div>
           <input
             type="date"
+            min={todayStr}
             value={selectedDate}
             onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
             className="text-[11px] bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-slate-700 font-medium"
@@ -266,12 +302,13 @@ export default function MobileBookingPage() {
 
         {/* Horizontal Days Scroll */}
         <div className="flex items-center gap-2 overflow-x-auto px-4 pb-3 no-scrollbar scroll-smooth">
-          {dateWindow.map((d) => {
-            const dateStr = formatDateStr(d);
+          {dateWindow.map((dateStr) => {
             const isSelected = dateStr === selectedDate;
-            const dayName = DAY_NAMES_TH[d.getDay()];
-            const dayNum = d.getDate();
-            const isToday = dateStr === formatDateStr(new Date());
+            const parts = dateStr.split('-').map(Number);
+            const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+            const dayName = DAY_NAMES_TH[dt.getDay()];
+            const dayNum = parts[2];
+            const isToday = dateStr === todayStr;
 
             return (
               <button
@@ -295,6 +332,23 @@ export default function MobileBookingPage() {
 
       {/* Time Slots Vertical Timeline */}
       <div className="px-4 py-4 space-y-3 flex-1">
+        {isPastSelectedDate && (
+          <div className="p-3.5 bg-slate-100 border border-slate-200/90 rounded-2xl flex items-center gap-2.5 text-slate-700">
+            <CalendarX className="w-5 h-5 text-slate-400 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-slate-800">ไม่อนุญาตให้จองย้อนหลัง</p>
+              <p className="text-[11px] text-slate-500">วันที่นี้ได้ผ่านพ้นไปแล้ว สามารถเปิดดูข้อมูลประวัติการจองเดิมได้เท่านั้น</p>
+            </div>
+          </div>
+        )}
+
+        {selectedDate === todayStr && OPERATIONAL_SLOTS.every((s) => s.start <= currentTimeStr) && (
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-2 text-amber-800 text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>รอบเวลาเปิดใช้งานสำหรับวันนี้ผ่านพ้นไปหมดแล้ว กรุณาเลือกวันอื่น</span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-slate-700 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-orange-600" />
@@ -312,7 +366,8 @@ export default function MobileBookingPage() {
               isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
             );
 
-            const isAvailable = !overlapping;
+            const isPastSlot = selectedDate === todayStr && slot.start <= currentTimeStr;
+            const isAvailable = !overlapping && !isPastSlot && !isPastSelectedDate;
 
             return (
               <div
@@ -327,21 +382,29 @@ export default function MobileBookingPage() {
                   <div className="flex items-center gap-2">
                     <span
                       className={`text-xs font-bold font-mono ${
-                        isAvailable ? 'text-slate-800' : 'text-slate-500 line-through'
+                        isPastSlot || isPastSelectedDate
+                          ? 'text-slate-400'
+                          : isAvailable
+                          ? 'text-slate-800'
+                          : 'text-slate-500 line-through'
                       }`}
                     >
                       {slot.label}
                     </span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        isAvailable
+                        isPastSlot || isPastSelectedDate
+                          ? 'bg-slate-200/60 text-slate-500 border border-slate-300/40'
+                          : isAvailable
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                           : overlapping?.status === 'APPROVED'
                           ? 'bg-red-50 text-red-700 border border-red-200/60'
                           : 'bg-amber-50 text-amber-700 border border-amber-200/60'
                       }`}
                     >
-                      {isAvailable
+                      {isPastSlot || isPastSelectedDate
+                        ? 'เลยเวลาแล้ว'
+                        : isAvailable
                         ? 'ว่าง'
                         : overlapping?.status === 'APPROVED'
                         ? 'อนุมัติแล้ว'
@@ -356,10 +419,12 @@ export default function MobileBookingPage() {
                   )}
                 </div>
 
-                {isAvailable ? (
+                {isPastSelectedDate || isPastSlot ? (
+                  <span className="text-[11px] text-slate-400 font-medium">เลยเวลาแล้ว</span>
+                ) : isAvailable ? (
                   <button
                     onClick={() => handleOpenFormWithSlot(slot.start, slot.end)}
-                    className="bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl shadow-xs transition"
+                    className="bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
                   >
                     จองช่วงนี้
                   </button>
@@ -371,6 +436,7 @@ export default function MobileBookingPage() {
           })}
         </div>
       </div>
+
 
       {/* -------------------- Top Popup Form -------------------- */}
       {isFormOpen && (

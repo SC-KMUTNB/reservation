@@ -5,6 +5,7 @@ import { recordAuditLog } from '@/lib/audit';
 
 import { notifyAdminNewBooking, notifyUserBookingReceived } from '@/lib/email';
 import { syncBookingToGoogleSheet } from '@/lib/google-sheets';
+import { isBackdated } from '@/lib/date-utils';
 
 function hasTimeOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
   return start1 < end2 && end1 > start2;
@@ -119,6 +120,30 @@ export async function POST(request: NextRequest) {
         { error: 'เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด' },
         { status: 400 }
       );
+    }
+
+    // Check if backdated (only enforce for non-admin requests)
+    const session = await getSessionFromRequest(request);
+    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN';
+
+    if (!isAdmin) {
+      const timezoneSetting = await prisma.siteSetting.findUnique({
+        where: { key: 'timezone' },
+      });
+      const backdatedCheck = isBackdated(date, startTime, timezoneSetting?.value);
+      if (backdatedCheck.isBackdated) {
+        if (backdatedCheck.reason === 'PAST_DATE') {
+          return NextResponse.json(
+            { error: 'ไม่อนุญาตให้จองย้อนหลัง กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต' },
+            { status: 400 }
+          );
+        } else {
+          return NextResponse.json(
+            { error: 'เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
