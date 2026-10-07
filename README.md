@@ -1,13 +1,126 @@
 # KMUTNB Student Council Meeting Room Reservation System
 (ระบบจองห้องประชุมสภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ)
 
-A full-stack meeting room reservation web application recreated from the original HTML mockup, built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, and **MongoDB (NoSQL Showcase)**, powered by **Bun** as runtime and package manager.
+A modern full-stack meeting room reservation web application built for the KMUTNB Student Council. Developed with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, and **MongoDB (NoSQL Showcase)**, powered by **Bun** as the runtime and package manager.
 
 > 💡 **NoSQL Showcase Branch (`feat/nosql-showcase`):** This branch demonstrates running the entire platform on **MongoDB NoSQL** instead of relational PostgreSQL. See [NOSQL_SHOWCASE.md](./NOSQL_SHOWCASE.md) for full architectural details and comparison.
 
 ---
 
-## Key Features
+## 💡 System Concept & Architecture
+
+### 1. Core Concept
+The system streamlines room reservations by eliminating paper forms and manual scheduling conflicts. It provides:
+- A transparent, self-service booking portal for students with instant validation.
+- An administrative back-office for student council officers to evaluate, approve, or reject reservation requests.
+- An immutable audit trail ensuring accountability, transparency, and university compliance.
+
+### 2. Reservation Lifecycle Workflow
+```
+[Student]
+   │
+   ├── 1. Browse Calendar Availability (Thai Buddhist Era Calendar)
+   ├── 2. Acknowledge Room Usage Regulations
+   ├── 3. Submit Reservation Request (Date, Start/End Time, Reason, Info)
+   │
+   ▼
+[Conflict Engine]
+   │ Checks for overlapping approved bookings on the chosen date & time
+   │
+   ▼
+[Booking Status: PENDING]
+   │ Automatically issues unique tracking code (KMUTNB-YYYY-XXXX-XXXX)
+   │
+   ▼
+[Admin Console]
+   │ Council Officer / Super Admin reviews request
+   ├── [APPROVE] ──► Status: APPROVED ──► Slot locked on calendar
+   └── [REJECT]  ──► Status: REJECTED ──► Rejection reason recorded
+   │
+   ▼
+[Audit Trail]
+   │ System writes AuditLog record (Admin, Action, Timestamp, IP Address)
+   │
+   ▼
+[Student Tracking (/track)]
+   │ Student checks status in real time via Student ID or Booking Code
+```
+
+### 3. Role-Based Access Control (RBAC)
+- **Public / Students:** Unauthenticated access to view schedule availability, submit reservations, and track booking statuses.
+- **Admin:** Authenticated council officers who can review reservations, approve/reject requests, inspect audit trails, and export reports.
+- **Super Admin:** Highest privilege level; can create and manage other admin accounts, reset passwords, suspend users, and modify dynamic site configurations (rules, contact details, social links).
+
+---
+
+## 🌐 Web Pages Catalog
+
+### 👥 Public Pages (Student Portal)
+| Route | Page | Description |
+|---|---|---|
+| `/` | **Home & Interactive Calendar** | Landing page featuring the Buddhist Era calendar, color-coded room status indicators, rules modal, contact info, and dynamic social media links. |
+| `/booking` | **Direct Booking Form** | Dedicated reservation form with slot-conflict checking, auto-fill validation, department selection, and instant confirmation code display. |
+| `/track` | **Status Tracking Portal** | Self-service lookup tool where applicants check reservation progress by Student ID or Booking Code (`KMUTNB-YYYY-XXXX-XXXX`), view rejection feedback, and cancel pending requests. |
+
+### 🔒 Protected Pages (Admin Portal)
+| Route | Page | Access Level | Description |
+|---|---|---|---|
+| `/admin/login` | **Admin Authentication** | Public | Secure login screen supporting email/password and KMUTNB Google Workspace OAuth. |
+| `/admin/dashboard` | **Management Dashboard** | Admin & Super Admin | Primary management interface to filter, inspect, approve, or reject reservations with custom reason prompts. |
+| `/admin/reports` | **Executive Reports** | Admin & Super Admin | Analytics overview and multi-sheet official Excel (`.xlsx`) export for university administration. |
+| `/admin/logs` | **Audit Logs Trail** | Admin & Super Admin | Complete security log tracking all admin actions, approvals, rejections, IP addresses, and timestamps. Super Admins can perform log maintenance. |
+| `/admin/users` | **User Management** | Super Admin Only | Account administration to create new admins, update roles, reset passwords, and toggle active/suspended statuses. |
+| `/admin/settings` | **System Settings** | Super Admin Only | Live dynamic site configuration editor for social media links, complaint form Google Form URL, contact details, and room rules. |
+| `/admin/profile` | **Admin Profile** | Admin & Super Admin | Personal profile management to change display names, update passwords, and link/unlink `@email.kmutnb.ac.th` Google accounts. |
+
+---
+
+## 📂 Directory Structure
+
+```text
+reservation/
+├── prisma/
+│   ├── schema.prisma               # Prisma data schema & MongoDB models definition
+│   └── seed.ts                     # Database seeder (default super admin & site settings)
+├── src/
+│   ├── app/                        # Next.js App Router (Pages, Layouts & Endpoints)
+│   │   ├── (public)/
+│   │   │   ├── page.tsx            # Landing page with Buddhist Era calendar
+│   │   │   ├── booking/page.tsx    # Dedicated room booking form
+│   │   │   └── track/page.tsx      # Student reservation tracking portal
+│   │   ├── admin/                  # Protected administrator interface
+│   │   │   ├── dashboard/page.tsx  # Booking approval & management dashboard
+│   │   │   ├── login/page.tsx      # Admin authentication page
+│   │   │   ├── logs/page.tsx       # System audit trail viewer
+│   │   │   ├── profile/page.tsx    # Account settings & Google OAuth linking
+│   │   │   ├── reports/page.tsx    # Summary reports & Excel exporter
+│   │   │   ├── settings/page.tsx   # Dynamic site & social settings manager
+│   │   │   ├── users/page.tsx      # Admin user management (RBAC)
+│   │   │   └── layout.tsx          # Admin layout shell with sidebar navigation
+│   │   ├── api/                    # RESTful Next.js Route Handlers
+│   │   │   ├── auth/               # Login, logout, session verification, OAuth
+│   │   │   ├── bookings/           # Booking CRUD, conflict checking, tracking
+│   │   │   ├── logs/               # Audit log querying and clearing
+│   │   │   ├── reports/            # Excel report generation endpoint
+│   │   │   ├── settings/           # Dynamic site settings read/write
+│   │   │   └── users/              # Admin account creation & management
+│   │   ├── globals.css             # Tailwind CSS styles & design tokens
+│   │   └── layout.tsx              # Root HTML layout with university meta branding
+│   └── lib/                        # Core backend utilities & application libraries
+│       ├── audit.ts                # Immutable audit log recording service
+│       ├── auth.ts                 # JWT session signing, cookie verification, auth guard
+│       └── prisma.ts               # Singleton Prisma Client connection instance
+├── docker-compose.yml              # Local container orchestrator (MongoDB Replica Set)
+├── .env.example                    # Environment variable template
+├── package.json                    # Project dependencies and script runner definitions
+├── tsconfig.json                   # TypeScript configuration
+├── NOSQL_SHOWCASE.md               # Dedicated NoSQL (MongoDB) architectural documentation
+└── README.md                       # Main project documentation
+```
+
+---
+
+## ✨ Key Features
 
 1. **Interactive Meeting Room Calendar & Booking:**
    - Buddhist Era (พ.ศ.) Thai calendar with live color-coded status dots (รออนุมัติ - สีเหลือง, อนุมัติแล้ว - สีเขียว, ถูกปฏิเสธ - สีแดง).
@@ -35,7 +148,7 @@ A full-stack meeting room reservation web application recreated from the origina
 
 ---
 
-## Admin Initialization & Security
+## 🔑 Admin Initialization & Security
 
 - **Initial Accounts Created by Seed (`bun run seed`):**
   - **Super Admin:** `admin@kmutnb.ac.th`
@@ -46,7 +159,7 @@ A full-stack meeting room reservation web application recreated from the origina
 
 ---
 
-## Local Development (with Bun)
+## 🚀 Local Development (with Bun)
 
 ### 1. Prerequisites
 Ensure [Bun](https://bun.sh) (v1.2+) and [Docker](https://www.docker.com/) are installed.
@@ -76,7 +189,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Google OAuth Setup (Optional)
+## 🔐 Google OAuth Setup (Optional)
 
 Admin users can link their Google accounts for one-click login. Only `@email.kmutnb.ac.th` Google accounts are accepted.
 
@@ -107,21 +220,18 @@ GOOGLE_CLIENT_SECRET="your-google-client-secret"
 3. Clicks **"เชื่อมบัญชี Google"** and authorizes with their `@email.kmutnb.ac.th` Google account.
 4. After linking, the admin can use the **"เข้าสู่ระบบด้วย Google"** button on the login page.
 
-> ℹ️ If `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are not set, the Google OAuth button will show an error message when clicked. The system works fine without Google OAuth — it's an optional convenience feature.
-
 ---
 
-## Deploying to Vercel
+## ☁️ Deploying to Vercel
 
 1. **Push your code to GitHub / GitLab**.
 2. **Import project into Vercel**.
 3. **Configure Environment Variables** in Vercel project settings:
-   - `DATABASE_URL`: Your cloud PostgreSQL connection string (Neon, Supabase, or Vercel Postgres).
+   - `DATABASE_URL`: Your MongoDB connection string (e.g., MongoDB Atlas).
    - `JWT_SECRET`: A secure random string for JWT session encryption.
    - `NEXT_PUBLIC_APP_URL`: Your production domain (e.g. `https://your-domain.vercel.app`).
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` *(optional)*: For Google OAuth admin login.
 4. **Build Command**:
    - Vercel will automatically run `prisma generate && next build` defined in `package.json`.
-5. **Run Database Migrations / Seed**:
+5. **Run Database Schema & Seed**:
    Run `bunx prisma db push` and `bun run seed` using your remote connection string.
-
