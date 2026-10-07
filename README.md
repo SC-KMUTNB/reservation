@@ -1,7 +1,9 @@
 # KMUTNB Student Council Meeting Room Reservation System
 (ระบบจองห้องประชุมสภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ)
 
-A full-stack meeting room reservation web application recreated from the original HTML mockup, built with **Next.js 14+ (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, and **PostgreSQL**, powered by **Bun** as runtime and package manager, ready for instant deployment on **Vercel**.
+A full-stack meeting room reservation web application recreated from the original HTML mockup, built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, and **MongoDB (NoSQL Showcase)**, powered by **Bun** as runtime and package manager.
+
+> 💡 **NoSQL Showcase Branch (`feat/nosql-showcase`):** This branch demonstrates running the entire platform on **MongoDB NoSQL** instead of relational PostgreSQL. See [NOSQL_SHOWCASE.md](./NOSQL_SHOWCASE.md) for full architectural details and comparison.
 
 ---
 
@@ -49,14 +51,15 @@ A full-stack meeting room reservation web application recreated from the origina
 ### 1. Prerequisites
 Ensure [Bun](https://bun.sh) (v1.2+) and [Docker](https://www.docker.com/) are installed.
 
-### 2. Start PostgreSQL Container
+### 2. Start MongoDB Container (Replica Set)
 ```bash
 docker compose up -d
 ```
 
-### 3. Install Dependencies
+### 3. Install Dependencies & Setup Environment
 ```bash
 bun install
+cp .env.example .env
 ```
 
 ### 4. Push Database Schema & Seed Data

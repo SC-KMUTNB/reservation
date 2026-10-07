@@ -1,16 +1,19 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: reservation-postgres
+  mongo:
+    image: mongo:7.0
+    container_name: reservation-mongo
     restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: reservation_db
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
+    healthcheck:
+      test: mongosh --port 27017 --eval 'rs.status().ok || rs.initiate()' || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
 
 volumes:
-  postgres_data:
+  mongo_data:

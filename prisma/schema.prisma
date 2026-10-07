@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -20,7 +20,7 @@ enum BookingStatus {
 }
 
 model User {
-  id               String      @id @default(cuid())
+  id               String      @id @default(auto()) @map("_id") @db.ObjectId
   email            String      @unique
   passwordHash     String
   fullName         String
@@ -35,7 +35,7 @@ model User {
 }
 
 model Booking {
-  id              String        @id @default(cuid())
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
   bookingCode     String        @unique
   date            String
   startTime       String
@@ -48,7 +48,7 @@ model Booking {
   reason          String
   status          BookingStatus @default(PENDING)
   rejectionReason String?
-  approvedById    String?
+  approvedById    String?       @db.ObjectId
   approvedBy      User?         @relation("ApprovedBy", fields: [approvedById], references: [id])
   approvedAt      DateTime?
   createdAt       DateTime      @default(now())
@@ -61,16 +61,16 @@ model Booking {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
   action     String
   details    String
   actorName  String
   actorEmail String?
   actorRole  String?
   ipAddress  String?
-  bookingId  String?
+  bookingId  String?  @db.ObjectId
   booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  userId     String?
+  userId     String?  @db.ObjectId
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now())
 
@@ -79,7 +79,7 @@ model AuditLog {
 }
 
 model SiteSetting {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   key         String   @unique
   value       String
   description String?
