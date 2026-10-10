@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 import { decryptSecret } from './encryption';
 import { recordAuditLog } from './audit';
+import { getAppBaseUrl } from './app-url';
 
 export type EmailRecipient = string | { name: string; address: string };
 
@@ -232,7 +233,7 @@ export async function notifyAdminNewBooking(booking: {
     return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = await getAppBaseUrl();
 
   const html = emailWrapper(
     'แจ้งเตือนคำขอจองห้องประชุมใหม่',
@@ -354,7 +355,7 @@ export async function notifyUserBookingReceived(booking: {
     return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = await getAppBaseUrl();
   const trackUrl = `${baseUrl}/track?q=${encodeURIComponent(booking.bookingCode)}`;
 
   const html = emailWrapper(
@@ -476,7 +477,7 @@ export async function notifyUserBookingStatusUpdate(booking: {
     return { success: true, provider: 'SKIPPED_RECIPIENT_TARGET' };
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = await getAppBaseUrl();
   const trackUrl = `${baseUrl}/track?q=${encodeURIComponent(booking.bookingCode)}`;
 
   let badgeColor = '#dcfce7';
@@ -581,11 +582,7 @@ export async function sendAdminInviteEmail(params: {
   inviterName?: string;
 }) {
   const { email, fullName, role, inviteToken, inviterName } = params;
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    process.env.BASE_URL ||
-    'http://localhost:3000';
+  const baseUrl = await getAppBaseUrl();
   const setupUrl = `${baseUrl}/admin/setup-password?token=${encodeURIComponent(inviteToken)}`;
 
   const roleText =
@@ -668,4 +665,3 @@ export async function sendAdminInviteEmail(params: {
 
   return res;
 }
-

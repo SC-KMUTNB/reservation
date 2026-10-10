@@ -45,6 +45,7 @@ export default function AdminSettingsPage() {
     timezone: 'Asia/Bangkok',
     contact_email: '',
     contact_phone: '',
+    app_base_url: '',
     // Email settings
     email_provider: 'AUTO',
     email_recipient_target: 'BOTH',
@@ -476,6 +477,19 @@ export default function AdminSettingsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Base URL สำหรับลิงก์ในอีเมล
+              </label>
+              <input
+                type="url"
+                value={settings.app_base_url || ''}
+                onChange={(e) => updateField('app_base_url', e.target.value)}
+                placeholder="https://your-domain.vercel.app"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 ผู้ให้บริการอีเมล (Active Provider)

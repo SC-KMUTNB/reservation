@@ -184,6 +184,19 @@ export default function MobileAdminSettingsPage() {
           </h3>
 
           <div>
+            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+              Base URL สำหรับลิงก์ในอีเมล
+            </label>
+            <input
+              type="url"
+              value={settings.app_base_url || ''}
+              onChange={(e) => updateField('app_base_url', e.target.value)}
+              placeholder="https://your-domain.vercel.app"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
+            />
+          </div>
+
+          <div>
             <label className="block text-[11px] font-semibold text-slate-700 mb-1">สถานะระบบอีเมล</label>
             <select
               value={settings.email_provider || 'SMTP'}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createSessionToken } from '@/lib/auth';
 import { recordAuditLog } from '@/lib/audit';
 import { jwtVerify } from 'jose';
+import { getAppBaseUrl } from '@/lib/app-url';
 
 const STATE_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'dev-fallback-secret-key-kmutnb-reservation-only'
@@ -14,10 +15,7 @@ export async function GET(request: NextRequest) {
   const stateToken = searchParams.get('state');
   const errorParam = searchParams.get('error');
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    request.nextUrl.origin ||
-    'http://localhost:3000';
+  const origin = await getAppBaseUrl(request.nextUrl.origin);
 
   const redirectUri = `${origin}/api/auth/google/callback`;
 
