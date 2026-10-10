@@ -1,5 +1,26 @@
 [
   {
+    "version": "v1.6.1",
+    "date": "2026-10-10",
+    "type": "minor",
+    "title": "เพิ่มการตั้งค่า Base URL ส่วนกลางสำหรับอีเมลและ OAuth",
+    "summary": "Super Admin สามารถกำหนด Base URL จากหน้า Settings เพื่อให้ลิงก์ในอีเมล ปุ่มในอีเมล และเส้นทาง Google OAuth ใช้โดเมนเดียวกัน โดยไม่ต้องพึ่งพา NEXT_PUBLIC_APP_URL ใน .env อีกต่อไป",
+    "changes": [
+      {
+        "category": "feat",
+        "description": "เพิ่มฟิลด์ตั้งค่า app_base_url ในหน้า Settings (Desktop/Mobile) สำหรับ Super Admin เพื่อกำหนด URL กลางของระบบ"
+      },
+      {
+        "category": "feat",
+        "description": "ลิงก์ในอีเมลทั้งหมด (ปุ่มติดตามสถานะ, ปุ่มเข้าหน้าแอดมิน, ลิงก์ตั้งรหัสผ่าน) และ Google OAuth redirect ใช้ URL จาก app_base_url"
+      },
+      {
+        "category": "improve",
+        "description": "ย้ายการกำหนด NEXT_PUBLIC_APP_URL ออกจาก .env.example และเอกสาร deployment ไปเป็นการตั้งค่าผ่านหน้าแอดมิน"
+      }
+    ]
+  },
+  {
     "version": "v1.6.0",
     "date": "2026-10-05",
     "type": "minor",

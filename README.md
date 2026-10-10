@@ -115,10 +115,9 @@ GOOGLE_CLIENT_SECRET="your-google-client-secret"
 3. **Configure Environment Variables** in Vercel project settings:
    - `DATABASE_URL`: Your cloud PostgreSQL connection string (Neon, Supabase, or Vercel Postgres).
    - `JWT_SECRET`: A secure random string for JWT session encryption.
-   - `NEXT_PUBLIC_APP_URL`: Your production domain (e.g. `https://your-domain.vercel.app`).
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` *(optional)*: For Google OAuth admin login.
-4. **Build Command**:
+4. หลัง Deploy ให้ไปที่ **Admin > Settings** แล้วกำหนดค่า **Base URL สำหรับลิงก์ในอีเมล** เป็นโดเมนจริงของระบบ (เช่น `https://your-domain.vercel.app`) เพื่อให้ปุ่มในอีเมลและลิงก์ OAuth ใช้ URL เดียวกัน.
+5. **Build Command**:
    - Vercel will automatically run `prisma generate && next build` defined in `package.json`.
-5. **Run Database Migrations / Seed**:
+6. **Run Database Migrations / Seed**:
    Run `bunx prisma db push` and `bun run seed` using your remote connection string.
-

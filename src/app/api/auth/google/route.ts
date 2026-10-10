@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { SignJWT } from 'jose';
+import { getAppBaseUrl } from '@/lib/app-url';
 
 const STATE_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'dev-fallback-secret-key-kmutnb-reservation-only'
@@ -13,10 +14,7 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    request.nextUrl.origin ||
-    'http://localhost:3000';
+  const origin = await getAppBaseUrl(request.nextUrl.origin);
 
   const redirectUri = `${origin}/api/auth/google/callback`;
 

@@ -48,12 +48,28 @@ function TrackContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [appBaseUrl, setAppBaseUrl] = useState('');
 
   useEffect(() => {
     if (initialQuery) {
       handleSearch(initialQuery);
     }
   }, [initialQuery]);
+
+  useEffect(() => {
+    const fetchAppBaseUrl = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        const value = String(data?.settings?.app_base_url || '').trim().replace(/\/+$/, '');
+        setAppBaseUrl(value);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchAppBaseUrl();
+  }, []);
 
   const handleSearch = async (searchTerm: string) => {
     if (!searchTerm.trim()) return;
@@ -79,6 +95,9 @@ function TrackContent() {
     e.preventDefault();
     handleSearch(query);
   };
+
+  const qrBaseUrl =
+    appBaseUrl || (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
 
   const copyCode = (code: string, id: string) => {
     navigator.clipboard.writeText(code);
@@ -295,7 +314,7 @@ function TrackContent() {
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50/80 border border-slate-100 rounded-2xl p-4">
                       <div className="shrink-0 p-2 bg-white rounded-xl border border-slate-200 shadow-xs">
                         <QRCodeSVG
-                          value={`${process.env.NEXT_PUBLIC_APP_URL || ''}/track?q=${encodeURIComponent(item.bookingCode)}`}
+                          value={`${qrBaseUrl}/track?q=${encodeURIComponent(item.bookingCode)}`}
                           size={96}
                           level="M"
                           includeMargin={false}
