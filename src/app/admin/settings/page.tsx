@@ -108,16 +108,17 @@ export default function AdminSettingsPage() {
       const res = await fetch('/api/settings');
       if (res.ok) {
         const data = await res.json();
-        setSettings((prev) => ({ ...prev, ...(data.settings || {}) }));
+        const { facility_config_json, ...cleanSettings } = (data.settings || {}) as Record<string, string>;
+        setSettings((prev) => ({ ...prev, ...cleanSettings }));
         setIsSuperAdmin(Boolean(data.isSuperAdmin));
         if (data.facilityConfig) {
           setFacilityConfig(data.facilityConfig);
           setRulesText((data.facilityConfig.bookingRules || []).join('\n'));
         }
-        if (data.settings?.admin_notification_email) {
-          setTestEmailTo(data.settings.admin_notification_email);
-        } else if (data.settings?.contact_email) {
-          setTestEmailTo(data.settings.contact_email);
+        if (cleanSettings?.admin_notification_email) {
+          setTestEmailTo(cleanSettings.admin_notification_email);
+        } else if (cleanSettings?.contact_email) {
+          setTestEmailTo(cleanSettings.contact_email);
         }
       }
     } catch (e) {
@@ -149,6 +150,10 @@ export default function AdminSettingsPage() {
       }
 
       setSuccessMsg('บันทึกการตั้งค่าระบบเรียบร้อยแล้ว (ข้อมูลสำคัญได้รับการเข้ารหัสอย่างปลอดภัย)');
+      if (data.facilityConfig) {
+        setFacilityConfig(data.facilityConfig);
+        setRulesText((data.facilityConfig.bookingRules || []).join('\n'));
+      }
     } catch (e) {
       console.error(e);
       setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -513,7 +518,7 @@ export default function AdminSettingsPage() {
                     : 'bg-slate-100/60 border-slate-200 text-slate-400 line-through'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none flex-grow">
                   <input
                     type="checkbox"
                     checked={eq.available}
@@ -521,7 +526,7 @@ export default function AdminSettingsPage() {
                     className="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                   />
                   <span>{eq.name}</span>
-                </div>
+                </label>
                 <button
                   type="button"
                   onClick={() => handleRemoveEquipment(eq.id)}
