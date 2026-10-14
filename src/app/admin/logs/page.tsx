@@ -14,6 +14,7 @@ import {
   CalendarX2,
   AlertTriangle,
   X,
+  RotateCw,
 } from 'lucide-react';
 
 interface AuditLogItem {
@@ -24,8 +25,10 @@ interface AuditLogItem {
   actorEmail?: string;
   actorRole?: string;
   ipAddress?: string;
+  bookingId?: string;
   createdAt: string;
   booking?: {
+    id?: string;
     bookingCode: string;
     fullName: string;
     date: string;
@@ -39,6 +42,7 @@ const ACTION_TABS = [
   { id: 'BOOKING_CREATED', label: 'สร้างคำขอใหม่' },
   { id: 'ADMIN_LOGIN', label: 'เข้าสู่ระบบ' },
   { id: 'SETTINGS', label: 'แก้ไขการตั้งค่า' },
+  { id: 'FAILED', label: 'รายการล้มเหลว' },
 ];
 
 type ConfirmMode = 'all' | 'before' | null;
@@ -54,6 +58,10 @@ export default function AdminLogsPage() {
   const [beforeDate, setBeforeDate] = useState('');
   const [isClearing, setIsClearing] = useState(false);
   const [clearResult, setClearResult] = useState<string | null>(null);
+
+  // Retry state
+  const [retryingLogId, setRetryingLogId] = useState<string | null>(null);
+  const [retryResult, setRetryResult] = useState<string | null>(null);
 
   useEffect(() => {
     // Check role from /api/auth/me
@@ -75,12 +83,40 @@ export default function AdminLogsPage() {
       const res = await fetch(`/api/logs?action=${action}`);
       if (res.ok) {
         const data = await res.json();
-        setLogs(data.logs || []);
+        let loadedLogs: AuditLogItem[] = data.logs || [];
+        if (action === 'FAILED') {
+          loadedLogs = loadedLogs.filter((l) => l.action.includes('FAILED'));
+        }
+        setLogs(loadedLogs);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRetrySyncFromLog = async (logId: string, bookingCodeOrId?: string) => {
+    if (!bookingCodeOrId) return;
+    setRetryingLogId(logId);
+    setRetryResult(null);
+    try {
+      const res = await fetch('/api/admin/retry-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingCode: bookingCodeOrId, syncType: 'ALL' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRetryResult(`ซิงก์ซ้ำล้มเหลว: ${data.error || 'ไม่ทราบสาเหตุ'}`);
+      } else {
+        setRetryResult(`ซิงก์ข้อมูลและส่งอีเมลซ้ำสำหรับ ${bookingCodeOrId} สำเร็จ`);
+        fetchLogs(actionFilter);
+      }
+    } catch {
+      setRetryResult('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setRetryingLogId(null);
     }
   };
 
@@ -111,6 +147,13 @@ export default function AdminLogsPage() {
   };
 
   const getActionBadge = (action: string) => {
+    if (action.includes('FAILED')) {
+      return (
+        <span className="bg-rose-50 text-rose-800 border border-rose-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <AlertTriangle className="w-3 h-3 text-rose-600" /> ล้มเหลว ({action})
+        </span>
+      );
+    }
     if (action === 'AUDIT_LOGS_CLEARED') {
       return (
         <span className="bg-rose-50 text-rose-800 border border-rose-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
@@ -128,14 +171,35 @@ export default function AdminLogsPage() {
     if (action.includes('REJECTED')) {
       return (
         <span className="bg-rose-50 text-rose-800 border border-rose-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
-          <XCircle className="w-3 h-3 text-rose-600" /> ปฏิเสธคำขอ
+          <XCircle className="w-3 h-3 text-rose-600" /> ปฏิเสธการจอง
+        </span>
+      );
+    }
+    if (action.includes('CANCELLED')) {
+      return (
+        <span className="bg-slate-100 text-slate-800 border border-slate-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <XCircle className="w-3 h-3 text-slate-500" /> ยกเลิกการจอง
+        </span>
+      );
+    }
+    if (action.includes('CHECK_IN')) {
+      return (
+        <span className="bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <CheckCircle className="w-3 h-3 text-amber-600" /> เช็กอินเข้าห้อง
+        </span>
+      );
+    }
+    if (action.includes('SYNC') || action.includes('RETRY')) {
+      return (
+        <span className="bg-blue-50 text-blue-800 border border-blue-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <RotateCw className="w-3 h-3 text-blue-600" /> ซิงก์ข้อมูลซ้ำ
         </span>
       );
     }
     if (action.includes('CREATED')) {
       return (
         <span className="bg-blue-50 text-blue-800 border border-blue-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
-          <Activity className="w-3 h-3 text-blue-600" /> สร้างคำขอ
+          <Activity className="w-3 h-3 text-blue-600" /> สร้างคำขอใหม่
         </span>
       );
     }
@@ -159,9 +223,6 @@ export default function AdminLogsPage() {
       </span>
     );
   };
-
-  // Today's date in YYYY-MM-DD for the date picker max
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -207,6 +268,16 @@ export default function AdminLogsPage() {
         </div>
       )}
 
+      {/* Retry sync result toast */}
+      {retryResult && (
+        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs px-4 py-3 rounded-2xl">
+          <span>{retryResult}</span>
+          <button onClick={() => setRetryResult(null)} className="text-blue-600 hover:text-blue-800 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Main Container */}
       <div className="bg-white rounded-3xl p-6 md:p-7 border border-slate-200/90 shadow-warm space-y-5">
         {/* Action Filter Pills */}
@@ -243,6 +314,11 @@ export default function AdminLogsPage() {
                 dateStyle: 'medium',
                 timeStyle: 'short',
               });
+              const isFailedSync =
+                log.action === 'EMAIL_DELIVERY_FAILED' ||
+                log.action === 'SHEET_SYNC_FAILED' ||
+                log.action.includes('FAILED');
+              const targetBookingCode = log.booking?.bookingCode || log.bookingId;
 
               return (
                 <div
@@ -284,11 +360,28 @@ export default function AdminLogsPage() {
                       )}
                     </div>
 
-                    {log.booking && (
-                      <span className="text-orange-600 bg-orange-50 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-orange-200">
-                        {log.booking.bookingCode} ({log.booking.date})
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {log.booking && (
+                        <span className="text-orange-600 bg-orange-50 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-orange-200">
+                          {log.booking.bookingCode} ({log.booking.date})
+                        </span>
+                      )}
+
+                      {isFailedSync && targetBookingCode && (
+                        <button
+                          type="button"
+                          onClick={() => handleRetrySyncFromLog(log.id, targetBookingCode)}
+                          disabled={retryingLogId === log.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition cursor-pointer active-press disabled:opacity-50"
+                          title="สั่งซิงก์ข้อมูลหรือส่งอีเมลซ้ำไปยังปลายทาง"
+                        >
+                          <RotateCw
+                            className={`w-3 h-3 ${retryingLogId === log.id ? 'animate-spin' : ''}`}
+                          />
+                          <span>{retryingLogId === log.id ? 'กำลังซิงก์...' : 'ซิงก์ข้อมูล/ส่งอีเมลซ้ำ'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -319,32 +412,31 @@ export default function AdminLogsPage() {
 
             {confirmMode === 'before' && (
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ลบบันทึกก่อนวันที่
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  ลบรายการก่อนวันที่:
                 </label>
                 <input
                   type="date"
-                  max={todayStr}
                   value={beforeDate}
                   onChange={(e) => setBeforeDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             )}
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex justify-end gap-2 pt-2">
               <button
-                onClick={() => { setConfirmMode(null); setBeforeDate(''); }}
-                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer active-press"
+                onClick={() => setConfirmMode(null)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleClear}
                 disabled={isClearing || (confirmMode === 'before' && !beforeDate)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition disabled:opacity-50 cursor-pointer active-press"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl transition cursor-pointer active-press shadow-xs"
               >
-                {isClearing ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                {isClearing ? 'กำลังล้าง...' : 'ยืนยันการล้าง'}
               </button>
             </div>
           </div>

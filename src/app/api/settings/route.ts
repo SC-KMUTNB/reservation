@@ -8,6 +8,7 @@ import {
   maskSecret,
   SENSITIVE_SETTING_KEYS,
 } from '@/lib/encryption';
+import { getFacilityConfig, saveFacilityConfig } from '@/lib/facility-config';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ settings: settingsMap, isSuperAdmin });
+    const facilityConfig = await getFacilityConfig();
+
+    return NextResponse.json({ settings: settingsMap, isSuperAdmin, facilityConfig });
   } catch (error) {
     console.error('Error fetching settings:', error);
     return NextResponse.json({ error: 'ไม่สามารถดึงข้อมูลการตั้งค่าได้' }, { status: 500 });
@@ -47,13 +50,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { settings } = body;
+    const { settings, facilityConfig } = body;
 
-    if (!settings || typeof settings !== 'object') {
-      return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 });
+    if (facilityConfig && typeof facilityConfig === 'object') {
+      await saveFacilityConfig(facilityConfig);
     }
 
-    for (const [key, rawValue] of Object.entries(settings)) {
+    if (settings && typeof settings === 'object') {
+      for (const [key, rawValue] of Object.entries(settings)) {
       const stringValue = String(rawValue ?? '').trim();
 
       if (SENSITIVE_SETTING_KEYS.includes(key)) {
@@ -86,6 +90,7 @@ export async function PUT(request: NextRequest) {
         });
       }
     }
+  }
 
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
     await recordAuditLog({

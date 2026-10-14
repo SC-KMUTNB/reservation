@@ -49,7 +49,8 @@ function LoginForm() {
         return;
       }
 
-      router.push('/admin/dashboard');
+      const callbackUrl = searchParams.get('callbackUrl');
+      router.push(callbackUrl && callbackUrl.startsWith('/') ? callbackUrl : '/admin/dashboard');
     } catch (e) {
       console.error(e);
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');

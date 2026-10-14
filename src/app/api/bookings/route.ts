@@ -1,11 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/auth';
 import { recordAuditLog } from '@/lib/audit';
 
 import { notifyAdminNewBooking, notifyUserBookingReceived } from '@/lib/email';
 import { syncBookingToGoogleSheet } from '@/lib/google-sheets';
-import { isBackdated } from '@/lib/date-utils';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { validateBookingInput } from '@/lib/booking-validation';
+import { getFacilityConfig } from '@/lib/facility-config';
+import { dispatchWebhookEvent } from '@/lib/webhook-notify';
 
 function hasTimeOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
   return start1 < end2 && end1 > start2;
@@ -85,7 +88,42 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const limitResult = checkRateLimit(`booking-submit:${ip}`, 5, 10 * 60 * 1000);
+    if (!limitResult.allowed) {
+      return rateLimitResponse(limitResult);
+    }
+
     const body = await request.json();
+
+    const session = await getSessionFromRequest(request);
+    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN';
+
+    let timezone = 'Asia/Bangkok';
+    if (!isAdmin) {
+      const timezoneSetting = await prisma.siteSetting.findUnique({
+        where: { key: 'timezone' },
+      });
+      if (timezoneSetting?.value) {
+        timezone = timezoneSetting.value;
+      }
+    }
+
+    const validation = validateBookingInput(body, {
+      checkBackdated: !isAdmin,
+      timezone,
+    });
+
+    if (!validation.isValid || !validation.sanitized) {
+      return NextResponse.json(
+        {
+          error: validation.firstError || 'ข้อมูลการจองไม่ถูกต้อง',
+          errors: validation.errors,
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       date,
       startTime,
@@ -96,54 +134,25 @@ export async function POST(request: NextRequest) {
       phone,
       department,
       reason,
-    } = body;
+    } = validation.sanitized;
 
-    if (
-      !date ||
-      !startTime ||
-      !endTime ||
-      !fullName ||
-      !studentId ||
-      !email ||
-      !phone ||
-      !department ||
-      !reason
-    ) {
+    const facilityConfig = await getFacilityConfig();
+
+    // Check closed dates
+    const blackoutDate = facilityConfig.closedDates?.find((c) => c.date === date);
+    if (blackoutDate) {
       return NextResponse.json(
-        { error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง' },
+        { error: `ห้องประชุมปิดให้บริการในวันที่ระบุ (${blackoutDate.reason || 'วันหยุดทำการ'})` },
         { status: 400 }
       );
     }
 
-    if (startTime >= endTime) {
+    // Check operating hours
+    if (startTime < facilityConfig.openTime || endTime > facilityConfig.closeTime) {
       return NextResponse.json(
-        { error: 'เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด' },
+        { error: `เวลาที่เลือกอยู่นอกเวลาทำการ (${facilityConfig.openTime} - ${facilityConfig.closeTime} น.)` },
         { status: 400 }
       );
-    }
-
-    // Check if backdated (only enforce for non-admin requests)
-    const session = await getSessionFromRequest(request);
-    const isAdmin = session?.role === 'ADMIN' || session?.role === 'SUPER_ADMIN';
-
-    if (!isAdmin) {
-      const timezoneSetting = await prisma.siteSetting.findUnique({
-        where: { key: 'timezone' },
-      });
-      const backdatedCheck = isBackdated(date, startTime, timezoneSetting?.value);
-      if (backdatedCheck.isBackdated) {
-        if (backdatedCheck.reason === 'PAST_DATE') {
-          return NextResponse.json(
-            { error: 'ไม่อนุญาตให้จองย้อนหลัง กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต' },
-            { status: 400 }
-          );
-        } else {
-          return NextResponse.json(
-            { error: 'เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต' },
-            { status: 400 }
-          );
-        }
-      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -190,8 +199,6 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
-
     await recordAuditLog({
       action: 'BOOKING_CREATED',
       details: `สร้างคำขอจองห้องประชุมวันที่ ${date} เวลา ${startTime} - ${endTime} น. โดย ${fullName} (${studentId})`,
@@ -202,12 +209,61 @@ export async function POST(request: NextRequest) {
       bookingId: result.id,
     });
 
-    // Dispatch notifications and sheet sync in parallel, awaiting completion to ensure delivery before response finishes
-    await Promise.allSettled([
-      notifyAdminNewBooking(result).catch((err) => console.error('Admin email notify failed:', err)),
-      notifyUserBookingReceived(result).catch((err) => console.error('User email notify failed:', err)),
-      syncBookingToGoogleSheet(result, 'CREATE').catch((err) => console.error('Google Sheet sync failed:', err)),
-    ]);
+    after(async () => {
+      try {
+        await notifyAdminNewBooking(result);
+      } catch (err: any) {
+        console.error('Admin email notify failed:', err);
+        await recordAuditLog({
+          action: 'EMAIL_DELIVERY_FAILED',
+          details: `ส่งอีเมลแจ้งเตือนแอดมินล้มเหลว (${result.bookingCode}): ${err?.message}`,
+          actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+          actorRole: 'SYSTEM',
+          bookingId: result.id,
+        });
+      }
+
+      try {
+        await notifyUserBookingReceived(result);
+      } catch (err: any) {
+        console.error('User email notify failed:', err);
+        await recordAuditLog({
+          action: 'EMAIL_DELIVERY_FAILED',
+          details: `ส่งอีเมลยืนยันคำขอผู้จองล้มเหลว (${result.bookingCode}): ${err?.message}`,
+          actorName: 'ระบบแจ้งเตือนอัตโนมัติ',
+          actorRole: 'SYSTEM',
+          bookingId: result.id,
+        });
+      }
+
+      try {
+        await syncBookingToGoogleSheet(result, 'CREATE');
+      } catch (err: any) {
+        console.error('Google Sheet sync failed:', err);
+        await recordAuditLog({
+          action: 'SHEET_SYNC_FAILED',
+          details: `ซิงก์ข้อมูลสร้างคำขอ ${result.bookingCode} ไปยัง Google Sheet ล้มเหลว: ${err?.message}`,
+          actorName: 'ระบบซิงก์อัตโนมัติ',
+          actorRole: 'SYSTEM',
+          bookingId: result.id,
+        });
+      }
+
+      try {
+        await dispatchWebhookEvent('BOOKING_CREATED', {
+          bookingCode: result.bookingCode,
+          fullName: result.fullName,
+          studentId: result.studentId,
+          department: result.department,
+          date: result.date,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          reason: result.reason,
+        });
+      } catch (err: any) {
+        console.error('Webhook dispatch failed:', err);
+      }
+    });
 
     return NextResponse.json({
       success: true,
