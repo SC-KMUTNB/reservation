@@ -31,6 +31,7 @@ model User {
   googleEmail      String?
   inviteToken      String?     @unique
   inviteExpiresAt  DateTime?
+  preferences      Json?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   approvedBookings Booking[]   @relation("ApprovedBy")
