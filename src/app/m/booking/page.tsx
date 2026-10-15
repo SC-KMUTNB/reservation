@@ -27,6 +27,7 @@ import {
 import MobileHeader from '@/components/mobile/MobileHeader';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 import { getNowInTimezone } from '@/lib/date-utils';
+import { calculateDayAvailability, OPERATIONAL_SLOTS } from '@/lib/booking-capacity';
 
 interface BookingItem {
   id: string;
@@ -38,21 +39,6 @@ interface BookingItem {
   department: string;
   fullName: string;
 }
-
-const OPERATIONAL_SLOTS = [
-  { start: '08:00', end: '09:00', label: '08:00 - 09:00' },
-  { start: '09:00', end: '10:00', label: '09:00 - 10:00' },
-  { start: '10:00', end: '11:00', label: '10:00 - 11:00' },
-  { start: '11:00', end: '12:00', label: '11:00 - 12:00' },
-  { start: '12:00', end: '13:00', label: '12:00 - 13:00' },
-  { start: '13:00', end: '14:00', label: '13:00 - 14:00' },
-  { start: '14:00', end: '15:00', label: '14:00 - 15:00' },
-  { start: '15:00', end: '16:00', label: '15:00 - 16:00' },
-  { start: '16:00', end: '17:00', label: '16:00 - 17:00' },
-  { start: '17:00', end: '18:00', label: '17:00 - 18:00' },
-  { start: '18:00', end: '19:00', label: '18:00 - 19:00' },
-  { start: '19:00', end: '20:00', label: '19:00 - 20:00' },
-];
 
 const MONTH_NAMES_TH = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -121,27 +107,6 @@ export default function MobileBookingPage() {
       .catch(console.error);
   }, []);
 
-  const fetchMonthBookings = useCallback(async (monthStr: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/bookings?month=${monthStr}`);
-      if (res.ok) {
-        const data = await res.json();
-        setBookings(data.bookings || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedMonthStr) {
-      fetchMonthBookings(selectedMonthStr);
-    }
-  }, [selectedMonthStr, fetchMonthBookings]);
-
   // Generate 21-day swipeable window starting from today in timezone
   const dateWindow = useMemo(() => {
     const dates: string[] = [];
@@ -156,6 +121,28 @@ export default function MobileBookingPage() {
     }
     return dates;
   }, [todayStr]);
+
+  const fetchBookingsWindow = useCallback(async () => {
+    if (dateWindow.length === 0) return;
+    setIsLoading(true);
+    try {
+      const start = selectedDate && selectedDate < dateWindow[0] ? selectedDate : dateWindow[0];
+      const end = selectedDate && selectedDate > dateWindow[dateWindow.length - 1] ? selectedDate : dateWindow[dateWindow.length - 1];
+      const res = await fetch(`/api/bookings?startDate=${start}&endDate=${end}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.bookings || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateWindow, selectedDate]);
+
+  useEffect(() => {
+    fetchBookingsWindow();
+  }, [fetchBookingsWindow]);
 
   // Filter bookings for the actively selected date
   const dayBookings = useMemo(() => {
@@ -259,7 +246,7 @@ export default function MobileBookingPage() {
         startTime: '09:00',
         endTime: '11:00',
       });
-      await fetchMonthBookings(selectedMonthStr);
+      await fetchBookingsWindow();
     } catch (e) {
       console.error(e);
       setErrorMessage('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -309,21 +296,44 @@ export default function MobileBookingPage() {
             const dayName = DAY_NAMES_TH[dt.getDay()];
             const dayNum = parts[2];
             const isToday = dateStr === todayStr;
+            const isPast = dateStr < todayStr;
+            const dayAvail = calculateDayAvailability(dateStr, bookings, isPast);
 
             return (
               <button
                 key={dateStr}
                 onClick={() => setSelectedDate(dateStr)}
-                className={`flex-shrink-0 flex flex-col items-center justify-center w-12 py-2 rounded-2xl transition-all cursor-pointer ${
+                className={`flex-shrink-0 flex flex-col items-center justify-between w-[70px] min-w-[70px] py-2 px-1.5 rounded-2xl transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 scale-105'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                    : isPast
+                    ? 'bg-slate-100/70 text-slate-400 border border-slate-200'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs'
                 }`}
               >
-                <span className={`text-[10px] uppercase ${isSelected ? 'text-orange-100' : 'text-slate-600'}`}>
+                <span className={`text-[10px] uppercase font-semibold ${isSelected ? 'text-orange-100' : 'text-slate-500'}`}>
                   {isToday ? 'วันนี้' : dayName}
                 </span>
-                <span className="text-sm font-extrabold mt-0.5">{dayNum}</span>
+                <span className="text-sm font-extrabold my-0.5">{dayNum}</span>
+
+                {/* Availability Badge Pill */}
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md leading-tight text-center max-w-[64px] truncate ${
+                    isSelected
+                      ? 'bg-white/20 text-white'
+                      : `${dayAvail.colorClasses.bg} ${dayAvail.colorClasses.text} border ${dayAvail.colorClasses.border}`
+                  }`}
+                >
+                  {dayAvail.label}
+                </span>
+
+                {/* Mini Capacity Progress Bar */}
+                <div className={`w-full ${isSelected ? 'bg-black/20' : 'bg-slate-100'} rounded-full h-1 mt-1 overflow-hidden`}>
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${isSelected ? 'bg-white' : dayAvail.colorClasses.bar}`}
+                    style={{ width: `${dayAvail.freePercentage}%` }}
+                  />
+                </div>
               </button>
             );
           })}
@@ -354,9 +364,16 @@ export default function MobileBookingPage() {
             <Clock className="w-3.5 h-3.5 text-orange-600" />
             <span>ตารางเวลาทำการ (08:00 - 20:00 น.)</span>
           </span>
-          <span className="text-[11px] text-slate-600">
-            {dayBookings.length === 0 ? 'ว่างทั้งวัน' : `จองแล้ว ${dayBookings.length} รายการ`}
-          </span>
+          {(() => {
+            const selectedAvail = calculateDayAvailability(selectedDate, dayBookings, isPastSelectedDate);
+            return (
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border leading-tight ${selectedAvail.colorClasses.bg} ${selectedAvail.colorClasses.text} ${selectedAvail.colorClasses.border}`}
+              >
+                {selectedAvail.label}
+              </span>
+            );
+          })()}
         </div>
 
         {/* Slot Cards List */}

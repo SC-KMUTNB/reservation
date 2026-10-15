@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 import { getNowInTimezone } from '@/lib/date-utils';
+import { calculateDayAvailability, OPERATIONAL_SLOTS } from '@/lib/booking-capacity';
 
 interface BookingItem {
   id: string;
@@ -48,22 +49,6 @@ const MONTH_NAMES_TH = [
 ];
 
 const PRELOAD_MONTHS_AHEAD = 3;
-
-// Operational hours: 08:00 - 20:00 (hourly intervals)
-const OPERATIONAL_SLOTS = [
-  { start: '08:00', end: '09:00', label: '08:00 - 09:00' },
-  { start: '09:00', end: '10:00', label: '09:00 - 10:00' },
-  { start: '10:00', end: '11:00', label: '10:00 - 11:00' },
-  { start: '11:00', end: '12:00', label: '11:00 - 12:00' },
-  { start: '12:00', end: '13:00', label: '12:00 - 13:00' },
-  { start: '13:00', end: '14:00', label: '13:00 - 14:00' },
-  { start: '14:00', end: '15:00', label: '14:00 - 15:00' },
-  { start: '15:00', end: '16:00', label: '15:00 - 16:00' },
-  { start: '16:00', end: '17:00', label: '16:00 - 17:00' },
-  { start: '17:00', end: '18:00', label: '17:00 - 18:00' },
-  { start: '18:00', end: '19:00', label: '18:00 - 19:00' },
-  { start: '19:00', end: '20:00', label: '19:00 - 20:00' },
-];
 
 function isTimeOverlapping(start1: string, end1: string, start2: string, end2: string): boolean {
   return start1 < end2 && end1 > start2;
@@ -460,15 +445,18 @@ export default function BookingPage() {
             </div>
 
             {/* Status Legend */}
-            <div className="flex flex-wrap items-center gap-2.5 text-xs bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
-              <span className="flex items-center gap-1.5 text-slate-600 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span> ว่าง
+            <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+              <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200"></span> ว่างทั้งวัน
               </span>
               <span className="flex items-center gap-1.5 text-amber-800 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200"></span> รอตรวจสอบ
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200"></span> ว่างปานกลาง
               </span>
-              <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200"></span> อนุมัติแล้ว
+              <span className="flex items-center gap-1.5 text-rose-800 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200"></span> ว่างน้อย / เต็ม
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span> ประวัติ
               </span>
             </div>
           </div>
@@ -537,6 +525,7 @@ export default function BookingPage() {
 
               const hasApproved = dayBookings.some((b) => b.status === 'APPROVED');
               const hasPending = dayBookings.some((b) => b.status === 'PENDING');
+              const availability = calculateDayAvailability(dateStr, dayBookings, isPast);
 
               let cardStyle =
                 'bg-white hover:border-orange-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800';
@@ -545,17 +534,35 @@ export default function BookingPage() {
               if (isPast) {
                 cardStyle =
                   'bg-slate-100/60 border-slate-200/60 text-slate-400 hover:border-slate-300';
-              } else if (hasApproved) {
+              } else if (availability.statusLevel === 'FULL') {
                 cardStyle =
-                  'bg-emerald-50/40 border-emerald-300 hover:border-emerald-500 hover:shadow-warm-sm text-slate-800';
+                  'bg-rose-50/40 border-rose-300 hover:border-rose-500 hover:shadow-warm-sm text-slate-800';
                 badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 shadow-xs"></span>
+                  <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 shadow-xs" title="เต็มทุกช่วง"></span>
+                );
+              } else if (availability.statusLevel === 'LOW') {
+                cardStyle =
+                  'bg-rose-50/20 border-rose-200 hover:border-rose-400 hover:shadow-warm-sm text-slate-800';
+                badgeDot = (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 shadow-xs" title="ว่างน้อย"></span>
+                );
+              } else if (availability.statusLevel === 'MODERATE') {
+                cardStyle =
+                  'bg-amber-50/30 border-amber-300 hover:border-amber-500 hover:shadow-warm-sm text-slate-800';
+                badgeDot = (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 shadow-xs" title="ว่างปานกลาง"></span>
                 );
               } else if (hasPending) {
                 cardStyle =
-                  'bg-amber-50/40 border-amber-300 hover:border-amber-500 hover:shadow-warm-sm text-slate-800';
+                  'bg-amber-50/20 border-amber-200 hover:border-amber-400 hover:shadow-warm-sm text-slate-800';
                 badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 shadow-xs"></span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 shadow-xs" title="มีรายการรอตรวจสอบ"></span>
+                );
+              } else {
+                cardStyle =
+                  'bg-white hover:border-emerald-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800';
+                badgeDot = (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 shadow-xs" title="ว่างทั้งวัน"></span>
                 );
               }
 
@@ -580,24 +587,23 @@ export default function BookingPage() {
                     {badgeDot}
                   </div>
 
-                  <div>
-                    {activeBookings.length > 0 ? (
-                      <div className={`text-[10px] md:text-[11px] font-semibold px-2 py-0.5 rounded-lg inline-block border leading-tight ${
-                        isPast
-                          ? 'bg-slate-200/70 text-slate-600 border-slate-300/60'
-                          : 'text-orange-800 bg-orange-100/80 border-orange-200/60'
-                      }`}>
-                        {activeBookings.length} รายการ
-                      </div>
-                    ) : isPast ? (
-                      <div className="text-[10px] md:text-[11px] text-slate-300 group-hover:text-slate-500 font-medium">
-                        ดูประวัติ
-                      </div>
-                    ) : (
-                      <div className="text-[10px] md:text-[11px] text-slate-300 group-hover:text-orange-600 transition-colors font-medium">
-                        คลิกจอง
-                      </div>
-                    )}
+                  <div className="space-y-1.5">
+                    {/* Availability Badge Pill */}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[10px] md:text-[11px] font-semibold px-2 py-0.5 rounded-lg inline-block border leading-tight ${availability.colorClasses.bg} ${availability.colorClasses.text} ${availability.colorClasses.border}`}
+                      >
+                        {availability.label}
+                      </span>
+                    </div>
+
+                    {/* Mini Capacity Progress Bar */}
+                    <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${availability.colorClasses.bar}`}
+                        style={{ width: `${availability.freePercentage}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               );
