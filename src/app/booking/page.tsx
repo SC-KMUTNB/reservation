@@ -106,11 +106,29 @@ export default function BookingPage({ currentMode = 'desktop' }: { currentMode?:
 
   const handleSelectDate = (dateStr: string) => {
     setSelectedDate(dateStr);
+    const bookingsForDate = (bookingsByMonth[dateStr.slice(0, 7)] || activeMonthBookings).filter(
+      (b) => b.date === dateStr
+    );
+    const isToday = dateStr === todayStr;
+    const isPast = dateStr < todayStr;
+
+    const firstAvailable = timeSlots.find((slot) => {
+      const isPastToday = isToday && slot.start <= nowTimeStr;
+      if (isPast || isPastToday) return false;
+      const conflict = bookingsForDate.some(
+        (b) =>
+          (b.status === 'APPROVED' || b.status === 'PENDING') &&
+          slot.start < b.endTime &&
+          slot.end > b.startTime
+      );
+      return !conflict;
+    });
+
     setFormData((prev) => ({
       ...prev,
       date: dateStr,
-      startTime: facilityConfig.openTime || '08:00',
-      endTime: timeSlots[1]?.end || '10:00',
+      startTime: firstAvailable?.start || '',
+      endTime: firstAvailable?.end || '',
     }));
     setValidationErrors({});
     setErrorMessage(null);

@@ -39,6 +39,10 @@
         "description": "ระบบตรวจจับและแจ้งเตือนคำขอรออนุมัติที่เวลาชนกัน พร้อมตัวเลือกปฏิเสธคำขอที่ชนกันโดยอัตโนมัติในขั้นตอนอนุมัติ"
       },
       {
+        "category": "feat",
+        "description": "ระบบจองห้องประชุมหลายชั่วโมงต่อเนื่อง (Multi-Hour Booking) แบบ Dual Mode รองรับทั้ง Dropdown ระบุเวลาเริ่มต้น/สิ้นสุด และการคลิกเลือกช่วงบนตารางเวลา (2-Click Range Selection) พร้อมระบบตรวจจับและจำกัดเวลาชนแบบไดนามิก (Smart Conflict Prevention)"
+      },
+      {
         "category": "improve",
         "description": "ปรับปรุงสถาปัตยกรรม Non-blocking Side Effects ด้วย after() จาก next/server, แยก Subcomponents ของหน้าจองห้องประชุมให้กระชับ (< 250 บรรทัด) และรวมหน้า Mobile (/m/*) ให้ใช้คอมโพเนนต์หลักร่วมกัน"
       },
