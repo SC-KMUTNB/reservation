@@ -21,8 +21,10 @@ import {
   ArrowUpNarrowWide,
 } from 'lucide-react';
 import { formatDisplayDate, getSearchableDateVariants } from '@/lib/date-utils';
+import AdminScheduleTimeline from '@/components/admin/AdminScheduleTimeline';
+import AdminMonthCalendar from '@/components/admin/AdminMonthCalendar';
 
-interface AdminBooking {
+export interface AdminBooking {
   id: string;
   bookingCode: string;
   date: string;
@@ -58,6 +60,9 @@ export default function MobileAdminDashboardPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [viewMode, setViewMode] = useState<'TABLE' | 'TIMELINE' | 'MONTH'>('TABLE');
+  const [timelineDate, setTimelineDate] = useState<Date>(new Date());
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
   // Action states
   const [rejectingBooking, setRejectingBooking] = useState<AdminBooking | null>(null);
@@ -85,8 +90,17 @@ export default function MobileAdminDashboardPage() {
     if (saved === 'asc' || saved === 'desc') {
       setSortOrder(saved);
     }
+    const savedView = localStorage.getItem('admin_dashboard_view_mode');
+    if (savedView === 'TABLE' || savedView === 'TIMELINE' || savedView === 'MONTH') {
+      setViewMode(savedView);
+    }
     fetchBookings();
   }, []);
+
+  const handleSetViewMode = (mode: 'TABLE' | 'TIMELINE' | 'MONTH') => {
+    setViewMode(mode);
+    localStorage.setItem('admin_dashboard_view_mode', mode);
+  };
 
   const handleSetSortOrder = (newOrder: 'desc' | 'asc') => {
     setSortOrder(newOrder);
@@ -318,8 +332,47 @@ export default function MobileAdminDashboardPage() {
         </div>
       </div>
 
-      {/* Search & Status Filter */}
-      <div className="space-y-2">
+      {/* View Switcher Tabs */}
+      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/90 overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={() => handleSetViewMode('TABLE')}
+          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            viewMode === 'TABLE'
+              ? 'bg-white text-orange-600 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>📋 ตาราง (Table)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSetViewMode('TIMELINE')}
+          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            viewMode === 'TIMELINE'
+              ? 'bg-white text-orange-600 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>🕒 ไทม์ไลน์ (Timeline)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSetViewMode('MONTH')}
+          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            viewMode === 'MONTH'
+              ? 'bg-white text-orange-600 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>📅 ปฏิทินเดือน (Calendar)</span>
+        </button>
+      </div>
+
+      {viewMode === 'TABLE' && (
+        <>
+          {/* Search & Status Filter */}
+          <div className="space-y-2">
         <div className="flex items-center gap-2">
           <div className="relative flex-grow">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -547,6 +600,35 @@ export default function MobileAdminDashboardPage() {
           })
         )}
       </div>
+      </>
+      )}
+
+      {viewMode === 'TIMELINE' && (
+        <AdminScheduleTimeline
+          bookings={bookings}
+          selectedDate={timelineDate}
+          onDateChange={setTimelineDate}
+          onSelectBooking={(b) => setDetailsBooking(b)}
+          onApproveBooking={(b) => updateBookingStatus(b.id, 'APPROVED')}
+          onRejectBooking={(b) => {
+            setRejectingBooking(b);
+            setRejectionReasonInput('');
+          }}
+        />
+      )}
+
+      {viewMode === 'MONTH' && (
+        <AdminMonthCalendar
+          bookings={bookings}
+          currentMonth={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          onSelectDate={(dateStr) => {
+            setTimelineDate(new Date(dateStr));
+            handleSetViewMode('TIMELINE');
+          }}
+          onSelectBooking={(b) => setDetailsBooking(b)}
+        />
+      )}
 
       {/* ----------------- Reject Bottom Sheet Modal ----------------- */}
       {rejectingBooking && (
