@@ -19,10 +19,18 @@ import {
   Filter,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  SlidersHorizontal,
+  CalendarDays,
 } from 'lucide-react';
-import { formatDisplayDate, getSearchableDateVariants } from '@/lib/date-utils';
-import AdminScheduleTimeline from '@/components/admin/AdminScheduleTimeline';
+import { formatDisplayDate, getSearchableDateVariants, getNowInTimezone } from '@/lib/date-utils';
+import AdminScheduleTimeline, { getWeekDates, toDateString } from '@/components/admin/AdminScheduleTimeline';
 import AdminMonthCalendar from '@/components/admin/AdminMonthCalendar';
+import DashboardCustomizerModal from '@/components/admin/DashboardCustomizerModal';
+import {
+  UserDashboardPreferences,
+  DEFAULT_USER_PREFERENCES,
+  mergeUserPreferences,
+} from '@/lib/user-preferences';
 
 export interface AdminBooking {
   id: string;
@@ -64,6 +72,10 @@ export default function MobileAdminDashboardPage() {
   const [timelineDate, setTimelineDate] = useState<Date>(new Date());
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
+  // User preferences & customization state
+  const [preferences, setPreferences] = useState<UserDashboardPreferences>(DEFAULT_USER_PREFERENCES);
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+
   // Action states
   const [rejectingBooking, setRejectingBooking] = useState<AdminBooking | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
@@ -94,8 +106,70 @@ export default function MobileAdminDashboardPage() {
     if (savedView === 'TABLE' || savedView === 'TIMELINE' || savedView === 'MONTH') {
       setViewMode(savedView);
     }
+    fetchUserPreferences();
     fetchBookings();
   }, []);
+
+  const fetchUserPreferences = async () => {
+    try {
+      const res = await fetch('/api/users/preferences');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preferences) {
+          const merged = mergeUserPreferences(data.preferences);
+          setPreferences(merged);
+
+          const savedView = localStorage.getItem('admin_dashboard_view_mode');
+          if (!savedView && merged.defaultView) {
+            const v = merged.defaultView === 'CALENDAR' ? 'MONTH' : merged.defaultView;
+            setViewMode(v as 'TABLE' | 'TIMELINE' | 'MONTH');
+          }
+
+          if (merged.defaultStatusFilter) {
+            setStatusFilter(merged.defaultStatusFilter);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load user preferences', e);
+    }
+  };
+
+  const handleSavePreferences = async (newPrefs: UserDashboardPreferences): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/users/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferences: newPrefs }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
+        return false;
+      }
+
+      const data = await res.json();
+      const merged = mergeUserPreferences(data.preferences || newPrefs);
+      setPreferences(merged);
+
+      if (merged.defaultView) {
+        const v = merged.defaultView === 'CALENDAR' ? 'MONTH' : merged.defaultView;
+        setViewMode(v as 'TABLE' | 'TIMELINE' | 'MONTH');
+        localStorage.setItem('admin_dashboard_view_mode', v);
+      }
+      if (merged.defaultStatusFilter) {
+        setStatusFilter(merged.defaultStatusFilter);
+      }
+
+      setActionSuccess('บันทึกการตั้งค่าแดชบอร์ดเรียบร้อยแล้ว');
+      return true;
+    } catch (err) {
+      console.error('Save preferences error:', err);
+      setActionError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      return false;
+    }
+  };
 
   const handleSetViewMode = (mode: 'TABLE' | 'TIMELINE' | 'MONTH') => {
     setViewMode(mode);
@@ -114,8 +188,11 @@ export default function MobileAdminDashboardPage() {
 
   useEffect(() => {
     let result = [...bookings];
+    const todayStr = getNowInTimezone().dateStr;
 
-    if (statusFilter !== 'ALL') {
+    if (statusFilter === 'TODAY') {
+      result = result.filter((b) => b.date === todayStr);
+    } else if (statusFilter !== 'ALL') {
       result = result.filter((b) => b.status === statusFilter);
     }
 
@@ -279,6 +356,26 @@ export default function MobileAdminDashboardPage() {
   };
 
   // Quick stats
+  const todayStr = getNowInTimezone().dateStr;
+  const todayCount = bookings.filter((b) => b.date === todayStr).length;
+
+  const weekDates = getWeekDates(new Date());
+  const weekDateStrings = new Set(weekDates.map(toDateString));
+  const weeklyCount = bookings.filter((b) => weekDateStrings.has(b.date)).length;
+
+  const nowTime = new Date().getTime();
+  const urgentBookings = bookings.filter((b) => {
+    if (b.status !== 'PENDING') return false;
+    try {
+      const bookingTime = new Date(`${b.date}T${b.startTime}:00`).getTime();
+      const diffHours = (bookingTime - nowTime) / (1000 * 60 * 60);
+      return diffHours >= 0 && diffHours <= 48;
+    } catch {
+      return false;
+    }
+  });
+  const urgentCount = urgentBookings.length;
+
   const pendingCount = bookings.filter((b) => b.status === 'PENDING').length;
   const approvedCount = bookings.filter((b) => b.status === 'APPROVED').length;
 
@@ -309,63 +406,104 @@ export default function MobileAdminDashboardPage() {
         </div>
       )}
 
-      {/* Metrics Glance */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">
-            รอพิจารณา (Pending)
-          </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-black text-amber-600">{pendingCount}</span>
-            <span className="text-[10px] text-slate-400">รายการ</span>
-          </div>
+      {/* Metrics Glance (Dynamic based on preferences) */}
+      {preferences.visibleWidgets.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5">
+          {preferences.visibleWidgets.includes('PENDING') && (
+            <div className="bg-white p-3.5 rounded-2xl border border-amber-200/80 bg-amber-50/20 shadow-2xs">
+              <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">
+                รอการตรวจสอบ (Pending)
+              </span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-2xl font-black text-amber-600">{pendingCount}</span>
+                <span className="text-[10px] text-slate-400">รายการ</span>
+              </div>
+            </div>
+          )}
+
+          {preferences.visibleWidgets.includes('TODAY') && (
+            <div className="bg-white p-3.5 rounded-2xl border border-blue-200/80 bg-blue-50/20 shadow-2xs">
+              <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider block">
+                การจองวันนี้ (Today)
+              </span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-2xl font-black text-blue-600">{todayCount}</span>
+                <span className="text-[10px] text-slate-400">รายการ</span>
+              </div>
+            </div>
+          )}
+
+          {preferences.visibleWidgets.includes('URGENT') && (
+            <div className="bg-white p-3.5 rounded-2xl border border-rose-200/80 bg-rose-50/20 shadow-2xs">
+              <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wider block">
+                เร่งด่วน 48 ชม. (Urgent)
+              </span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-2xl font-black text-rose-600">{urgentCount}</span>
+                <span className="text-[10px] text-slate-400">รายการ</span>
+              </div>
+            </div>
+          )}
+
+          {preferences.visibleWidgets.includes('WEEKLY') && (
+            <div className="bg-white p-3.5 rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-2xs">
+              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">
+                รวมในสัปดาห์นี้
+              </span>
+              <div className="flex items-baseline justify-between mt-1">
+                <span className="text-2xl font-black text-emerald-600">{weeklyCount}</span>
+                <span className="text-[10px] text-slate-400">รายการ</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* View Switcher Tabs & Customize Button */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/90 overflow-x-auto no-scrollbar">
+          <button
+            type="button"
+            onClick={() => handleSetViewMode('TABLE')}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              viewMode === 'TABLE'
+                ? 'bg-white text-orange-600 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📋 ตาราง</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetViewMode('TIMELINE')}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              viewMode === 'TIMELINE'
+                ? 'bg-white text-orange-600 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🕒 ไทม์ไลน์</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetViewMode('MONTH')}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+              viewMode === 'MONTH'
+                ? 'bg-white text-orange-600 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📅 ปฏิทิน</span>
+          </button>
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">
-            อนุมัติแล้ว (Approved)
-          </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-black text-emerald-600">{approvedCount}</span>
-            <span className="text-[10px] text-slate-400">รายการ</span>
-          </div>
-        </div>
-      </div>
-
-      {/* View Switcher Tabs */}
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200/90 overflow-x-auto no-scrollbar">
         <button
           type="button"
-          onClick={() => handleSetViewMode('TABLE')}
-          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-            viewMode === 'TABLE'
-              ? 'bg-white text-orange-600 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          onClick={() => setIsCustomizerOpen(true)}
+          className="p-2.5 bg-white border border-slate-200 rounded-2xl text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition shrink-0 cursor-pointer flex items-center justify-center"
+          title="ปรับแต่งแดชบอร์ด"
         >
-          <span>📋 ตาราง (Table)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSetViewMode('TIMELINE')}
-          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-            viewMode === 'TIMELINE'
-              ? 'bg-white text-orange-600 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <span>🕒 ไทม์ไลน์ (Timeline)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSetViewMode('MONTH')}
-          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-            viewMode === 'MONTH'
-              ? 'bg-white text-orange-600 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <span>📅 ปฏิทินเดือน (Calendar)</span>
+          <SlidersHorizontal className="w-4 h-4 text-orange-600" />
         </button>
       </div>
 
@@ -411,6 +549,7 @@ export default function MobileAdminDashboardPage() {
           {[
             { id: 'ALL', label: 'ทั้งหมด' },
             { id: 'PENDING', label: `รออนุมัติ (${pendingCount})` },
+            { id: 'TODAY', label: `วันนี้ (${todayCount})` },
             { id: 'APPROVED', label: 'อนุมัติแล้ว' },
             { id: 'REJECTED', label: 'ปฏิเสธ' },
             { id: 'CANCELLED', label: 'ยกเลิก' },
@@ -484,7 +623,9 @@ export default function MobileAdminDashboardPage() {
             return (
               <div
                 key={b.id}
-                className={`bg-white rounded-2xl p-4 border transition-colors shadow-2xs space-y-3 ${
+                className={`bg-white rounded-2xl border transition-colors shadow-2xs ${
+                  preferences.tableDensity === 'compact' ? 'p-3 space-y-2' : 'p-4 space-y-3'
+                } ${
                   selectedIds.has(b.id)
                     ? 'border-orange-300 bg-orange-50/20 ring-1 ring-orange-300'
                     : 'border-slate-200/90'
@@ -524,19 +665,23 @@ export default function MobileAdminDashboardPage() {
                 </div>
 
                 {/* Details */}
-                <div className="space-y-1 text-xs text-slate-700">
+                <div className={`text-xs text-slate-700 ${preferences.tableDensity === 'compact' ? 'space-y-0.5' : 'space-y-1'}`}>
                   <div className="flex items-center gap-1.5 font-semibold text-slate-900">
                     <User className="w-3.5 h-3.5 text-orange-600 shrink-0" />
                     <span>{b.fullName}</span>
-                    <span className="text-[11px] text-slate-500 font-mono font-normal">
-                      ({b.studentId})
-                    </span>
+                    {preferences.visibleColumns.studentId && b.studentId && (
+                      <span className="text-[11px] text-slate-500 font-mono font-normal">
+                        ({b.studentId})
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                    <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{b.department}</span>
-                  </div>
+                  {preferences.visibleColumns.department && b.department && (
+                    <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                      <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{b.department}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2 text-slate-700 pt-0.5">
                     <Calendar className="w-3.5 h-3.5 text-orange-600 shrink-0" />
@@ -546,9 +691,23 @@ export default function MobileAdminDashboardPage() {
                     <span className="font-mono">{b.startTime} - {b.endTime} น.</span>
                   </div>
 
-                  <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl mt-1.5 font-light line-clamp-2">
-                    {b.reason}
-                  </p>
+                  {preferences.visibleColumns.reason && b.reason && (
+                    <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl mt-1 font-light line-clamp-2">
+                      {b.reason}
+                    </p>
+                  )}
+
+                  {preferences.visibleColumns.approvedBy && b.approvedBy && (
+                    <div className="text-[10px] text-slate-500 pt-0.5 flex items-center gap-1">
+                      <span>ผู้อนุมัติ:</span>
+                      <span className="font-medium text-slate-700">{b.approvedBy.fullName}</span>
+                      {b.approvedAt && (
+                        <span className="font-mono text-slate-400">
+                          ({new Date(b.approvedAt).toLocaleDateString('th-TH')})
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -1021,6 +1180,14 @@ export default function MobileAdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Per-Admin Dashboard Customizer Modal */}
+      <DashboardCustomizerModal
+        isOpen={isCustomizerOpen}
+        onClose={() => setIsCustomizerOpen(false)}
+        preferences={preferences}
+        onSave={handleSavePreferences}
+      />
     </div>
   );
 }

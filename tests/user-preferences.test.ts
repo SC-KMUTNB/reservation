@@ -9,6 +9,7 @@ import {
   type UserDashboardPreferences,
 } from '../src/lib/user-preferences';
 import { GET, PATCH } from '../src/app/api/users/preferences/route';
+import { GET as getAuthMe } from '../src/app/api/auth/me/route';
 import { NextRequest } from 'next/server';
 import * as authModule from '../src/lib/auth';
 import { prisma } from '../src/lib/prisma';
@@ -172,5 +173,42 @@ describe('User Preferences API Routes', () => {
     expect(data.preferences.visibleColumns.department).toBe(false);
     expect(data.preferences.visibleColumns.studentId).toBe(true);
     expect(updatedData.defaultView).toBe('MONTH');
+  });
+
+  it('GET /api/auth/me includes preferences in user session response', async () => {
+    spyOn(authModule, 'getSessionFromRequest').mockResolvedValue({
+      id: 'mock-user-1',
+      email: 'admin@kmutnb.ac.th',
+      fullName: 'Mock Admin',
+      role: 'ADMIN',
+    });
+
+    (prisma as any).user = {
+      findUnique: async () => ({
+        id: 'mock-user-1',
+        email: 'admin@kmutnb.ac.th',
+        username: 'mockadmin',
+        fullName: 'Mock Admin',
+        role: 'ADMIN',
+        isActive: true,
+        googleId: null,
+        googleEmail: null,
+        preferences: {
+          defaultView: 'MONTH',
+          density: 'compact',
+        },
+      }),
+    };
+
+    const req = new NextRequest('http://localhost:3000/api/auth/me');
+    const res = await getAuthMe(req);
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.authenticated).toBe(true);
+    expect(data.user.preferences).toBeDefined();
+    expect(data.user.preferences.defaultView).toBe('MONTH');
+    expect(data.user.preferences.tableDensity).toBe('compact');
+    expect(data.user.preferences.visibleWidgets).toEqual(DEFAULT_USER_PREFERENCES.visibleWidgets);
   });
 });

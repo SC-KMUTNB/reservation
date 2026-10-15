@@ -22,10 +22,18 @@ import {
   AlertCircle,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  SlidersHorizontal,
+  CalendarDays,
 } from 'lucide-react';
-import { formatDisplayDate, getSearchableDateVariants } from '@/lib/date-utils';
-import AdminScheduleTimeline from '@/components/admin/AdminScheduleTimeline';
+import { formatDisplayDate, getSearchableDateVariants, getNowInTimezone } from '@/lib/date-utils';
+import AdminScheduleTimeline, { getWeekDates, toDateString } from '@/components/admin/AdminScheduleTimeline';
 import AdminMonthCalendar from '@/components/admin/AdminMonthCalendar';
+import DashboardCustomizerModal from '@/components/admin/DashboardCustomizerModal';
+import {
+  UserDashboardPreferences,
+  DEFAULT_USER_PREFERENCES,
+  mergeUserPreferences,
+} from '@/lib/user-preferences';
 
 export interface AdminBooking {
   id: string;
@@ -68,6 +76,10 @@ export default function AdminDashboardPage() {
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [detailsBooking, setDetailsBooking] = useState<AdminBooking | null>(null);
 
+  // User preferences & customization state
+  const [preferences, setPreferences] = useState<UserDashboardPreferences>(DEFAULT_USER_PREFERENCES);
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+
   const [rejectingBooking, setRejectingBooking] = useState<AdminBooking | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -94,8 +106,70 @@ export default function AdminDashboardPage() {
     if (savedView === 'TABLE' || savedView === 'TIMELINE' || savedView === 'MONTH') {
       setViewMode(savedView);
     }
+    fetchUserPreferences();
     fetchBookings();
   }, []);
+
+  const fetchUserPreferences = async () => {
+    try {
+      const res = await fetch('/api/users/preferences');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preferences) {
+          const merged = mergeUserPreferences(data.preferences);
+          setPreferences(merged);
+
+          const savedView = localStorage.getItem('admin_dashboard_view_mode');
+          if (!savedView && merged.defaultView) {
+            const v = merged.defaultView === 'CALENDAR' ? 'MONTH' : merged.defaultView;
+            setViewMode(v as 'TABLE' | 'TIMELINE' | 'MONTH');
+          }
+
+          if (merged.defaultStatusFilter) {
+            setStatusFilter(merged.defaultStatusFilter);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load user preferences', e);
+    }
+  };
+
+  const handleSavePreferences = async (newPrefs: UserDashboardPreferences): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/users/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferences: newPrefs }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
+        return false;
+      }
+
+      const data = await res.json();
+      const merged = mergeUserPreferences(data.preferences || newPrefs);
+      setPreferences(merged);
+
+      if (merged.defaultView) {
+        const v = merged.defaultView === 'CALENDAR' ? 'MONTH' : merged.defaultView;
+        setViewMode(v as 'TABLE' | 'TIMELINE' | 'MONTH');
+        localStorage.setItem('admin_dashboard_view_mode', v);
+      }
+      if (merged.defaultStatusFilter) {
+        setStatusFilter(merged.defaultStatusFilter);
+      }
+
+      setActionSuccess('บันทึกการตั้งค่าแดชบอร์ดเรียบร้อยแล้ว');
+      return true;
+    } catch (err) {
+      console.error('Save preferences error:', err);
+      setActionError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      return false;
+    }
+  };
 
   const handleSetViewMode = (mode: 'TABLE' | 'TIMELINE' | 'MONTH') => {
     setViewMode(mode);
@@ -114,8 +188,11 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     let result = [...bookings];
+    const todayStr = getNowInTimezone().dateStr;
 
-    if (statusFilter !== 'ALL') {
+    if (statusFilter === 'TODAY') {
+      result = result.filter((b) => b.date === todayStr);
+    } else if (statusFilter !== 'ALL') {
       result = result.filter((b) => b.status === statusFilter);
     }
 
@@ -301,11 +378,34 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const todayStr = getNowInTimezone().dateStr;
+  const todayCount = bookings.filter((b) => b.date === todayStr).length;
+
+  const weekDates = getWeekDates(new Date());
+  const weekDateStrings = new Set(weekDates.map(toDateString));
+  const weeklyCount = bookings.filter((b) => weekDateStrings.has(b.date)).length;
+
+  const nowTime = new Date().getTime();
+  const urgentBookings = bookings.filter((b) => {
+    if (b.status !== 'PENDING') return false;
+    try {
+      const bookingTime = new Date(`${b.date}T${b.startTime}:00`).getTime();
+      const diffHours = (bookingTime - nowTime) / (1000 * 60 * 60);
+      return diffHours >= 0 && diffHours <= 48;
+    } catch {
+      return false;
+    }
+  });
+  const urgentCount = urgentBookings.length;
+
   const stats = {
     total: bookings.length,
     pending: bookings.filter((b) => b.status === 'PENDING').length,
     approved: bookings.filter((b) => b.status === 'APPROVED').length,
     rejected: bookings.filter((b) => b.status === 'REJECTED').length,
+    today: todayCount,
+    urgent: urgentCount,
+    weekly: weeklyCount,
   };
 
   return (
@@ -329,54 +429,66 @@ export default function AdminDashboardPage() {
         </Link>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-warm-xs">
-          <div className="flex justify-between items-center text-slate-500 text-xs font-medium">
-            <span>คำขอทั้งหมด</span>
-            <Calendar className="w-4 h-4 text-slate-400" />
-          </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-slate-900 mt-2 tabular-nums font-mono">
-            {stats.total}
-          </div>
-        </div>
+      {/* KPI Stat Cards (Dynamic based on visibleWidgets) */}
+      {preferences.visibleWidgets.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {preferences.visibleWidgets.includes('PENDING') && (
+            <div className="bg-white p-5 rounded-3xl border border-amber-200/80 bg-amber-50/20 shadow-warm-xs">
+              <div className="flex justify-between items-center text-amber-800 text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200"></span> รอการอนุมัติ
+                </span>
+                <Clock className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="text-2xl md:text-3xl font-extrabold text-amber-900 mt-2 tabular-nums font-mono">
+                {stats.pending}
+              </div>
+            </div>
+          )}
 
-        <div className="bg-white p-5 rounded-3xl border border-amber-200/80 bg-amber-50/20 shadow-warm-xs">
-          <div className="flex justify-between items-center text-amber-800 text-xs font-semibold">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200"></span> รอการอนุมัติ
-            </span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-amber-900 mt-2 tabular-nums font-mono">
-            {stats.pending}
-          </div>
-        </div>
+          {preferences.visibleWidgets.includes('TODAY') && (
+            <div className="bg-white p-5 rounded-3xl border border-blue-200/80 bg-blue-50/20 shadow-warm-xs">
+              <div className="flex justify-between items-center text-blue-800 text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 ring-2 ring-blue-200"></span> การจองวันนี้
+                </span>
+                <Calendar className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="text-2xl md:text-3xl font-extrabold text-blue-900 mt-2 tabular-nums font-mono">
+                {stats.today}
+              </div>
+            </div>
+          )}
 
-        <div className="bg-white p-5 rounded-3xl border border-emerald-200/80 bg-emerald-50/20 shadow-warm-xs">
-          <div className="flex justify-between items-center text-emerald-800 text-xs font-semibold">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200"></span> อนุมัติแล้ว
-            </span>
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-emerald-900 mt-2 tabular-nums font-mono">
-            {stats.approved}
-          </div>
-        </div>
+          {preferences.visibleWidgets.includes('URGENT') && (
+            <div className="bg-white p-5 rounded-3xl border border-rose-200/80 bg-rose-50/20 shadow-warm-xs">
+              <div className="flex justify-between items-center text-rose-800 text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 animate-pulse"></span> เร่งด่วน 48 ชม.
+                </span>
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="text-2xl md:text-3xl font-extrabold text-rose-900 mt-2 tabular-nums font-mono">
+                {stats.urgent}
+              </div>
+            </div>
+          )}
 
-        <div className="bg-white p-5 rounded-3xl border border-rose-200/80 bg-rose-50/20 shadow-warm-xs">
-          <div className="flex justify-between items-center text-rose-800 text-xs font-semibold">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200"></span> ถูกปฏิเสธ
-            </span>
-            <XCircle className="w-4 h-4 text-rose-500" />
-          </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-rose-900 mt-2 tabular-nums font-mono">
-            {stats.rejected}
-          </div>
+          {preferences.visibleWidgets.includes('WEEKLY') && (
+            <div className="bg-white p-5 rounded-3xl border border-emerald-200/80 bg-emerald-50/20 shadow-warm-xs">
+              <div className="flex justify-between items-center text-emerald-800 text-xs font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200"></span> รวมในสัปดาห์นี้
+                </span>
+                <CalendarDays className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="text-2xl md:text-3xl font-extrabold text-emerald-900 mt-2 tabular-nums font-mono">
+                {stats.weekly}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Notifications */}
       {actionError && (
@@ -403,7 +515,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* View Switcher Header */}
+      {/* View Switcher Header & Customize Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 w-fit">
           <button
@@ -440,6 +552,22 @@ export default function AdminDashboardPage() {
             <span>📅 ปฏิทินเดือน (Calendar)</span>
           </button>
         </div>
+
+        {/* Customize Dashboard Button */}
+        <button
+          type="button"
+          onClick={() => setIsCustomizerOpen(true)}
+          className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold shadow-2xs hover:border-slate-300 active:scale-95 transition cursor-pointer self-start sm:self-auto"
+          title="ปรับแต่งการแสดงผลแดชบอร์ดตามความต้องการของคุณ"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-orange-600" />
+          <span>ปรับแต่งแดชบอร์ด</span>
+          {preferences.tableDensity === 'compact' && (
+            <span className="text-[10px] bg-orange-100 text-orange-700 font-mono px-1.5 py-0.5 rounded-md font-semibold">
+              กะทัดรัด
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Main Content Area based on View Mode */}
@@ -468,6 +596,16 @@ export default function AdminDashboardPage() {
               }`}
             >
               รออนุมัติ ({stats.pending})
+            </button>
+            <button
+              onClick={() => setStatusFilter('TODAY')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition active-press whitespace-nowrap cursor-pointer ${
+                statusFilter === 'TODAY'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-blue-800 hover:text-blue-900'
+              }`}
+            >
+              วันนี้ ({stats.today})
             </button>
             <button
               onClick={() => setStatusFilter('APPROVED')}
@@ -537,197 +675,236 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Bookings Table */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
-                <th className="p-3.5 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={pendingInView.length > 0 && isAllPendingSelected}
-                    ref={(el) => {
-                      if (el) {
-                        el.indeterminate = isSomePendingSelected;
-                      }
-                    }}
-                    disabled={pendingInView.length === 0}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="เลือกคำขอรออนุมัติทั้งหมด"
-                  />
-                </th>
-                <th
-                  onClick={toggleSortOrder}
-                  className="p-3.5 cursor-pointer hover:bg-slate-100/90 transition-colors select-none group"
-                  title="คลิกเพื่อสลับการเรียงลำดับวันที่ (ใหม่สุด / เก่าสุด)"
-                >
-                  <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                    <span>วันที่ & เวลา</span>
-                    <span className="text-orange-600 transition-transform group-hover:scale-110">
-                      {sortOrder === 'desc' ? (
-                        <ArrowDownWideNarrow className="w-4 h-4" />
-                      ) : (
-                        <ArrowUpNarrowWide className="w-4 h-4" />
-                      )}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-500 group-hover:text-orange-600">
-                      ({sortOrder === 'desc' ? 'ใหม่สุด' : 'เก่าสุด'})
-                    </span>
-                  </div>
-                </th>
-                <th className="p-3.5">ผู้จอง & ข้อมูลติดต่อ</th>
-                <th className="p-3.5">หน่วยงาน & วัตถุประสงค์</th>
-                <th className="p-3.5">สถานะ</th>
-                <th className="p-3.5">ผู้พิจารณา</th>
-                <th className="p-3.5 text-right">ดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="p-10 text-center text-slate-400">
-                    กำลังดึงข้อมูลคำขอจองล่าสุด...
-                  </td>
-                </tr>
-              ) : filteredBookings.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400">
-                    <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <div>ไม่พบรายการจองตามเงื่อนไขที่เลือก</div>
-                  </td>
-                </tr>
-              ) : (
-                filteredBookings.map((b) => (
-                  <tr
-                    key={b.id}
-                    className={`hover:bg-slate-50/70 transition-colors ${
-                      selectedIds.has(b.id) ? 'bg-orange-50/40' : ''
-                    }`}
-                  >
-                    <td className="p-3.5 w-10 text-center">
-                      {b.status === 'PENDING' ? (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(b.id)}
-                          onChange={() => handleToggleSelect(b.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                        />
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900 tabular-nums font-mono">
-                        {formatDisplayDate(b.date)}
-                      </div>
-                      <div className="text-slate-600 text-[11px] flex items-center gap-1 mt-0.5 tabular-nums font-mono">
-                        <Clock className="w-3 h-3 text-slate-400" /> {b.startTime} - {b.endTime} น.
-                      </div>
-                      <div className="font-mono text-[10px] text-orange-600 mt-1 bg-orange-50 px-1.5 py-0.5 rounded inline-block border border-orange-200/60">
-                        {b.bookingCode}
-                      </div>
-                    </td>
+        {(() => {
+          const totalVisibleColSpan =
+            5 +
+            (preferences.visibleColumns.studentId ? 1 : 0) +
+            (preferences.visibleColumns.department ? 1 : 0) +
+            (preferences.visibleColumns.reason ? 1 : 0) +
+            (preferences.visibleColumns.approvedBy ? 1 : 0);
+          const cellPadding =
+            preferences.tableDensity === 'compact' ? 'py-2 px-3 text-xs' : 'py-3.5 px-4 text-xs';
+          const headerPadding =
+            preferences.tableDensity === 'compact' ? 'py-2 px-3 text-[11px]' : 'py-3.5 px-4 text-[11px]';
 
-                    <td className="p-3.5">
-                      <div className="font-semibold text-slate-900 text-xs">{b.fullName}</div>
-                      <div className="text-slate-500 text-[11px] font-mono mt-0.5">รหัส: {b.studentId}</div>
-                      <div className="text-slate-400 text-[10px] mt-0.5">โทร: {b.phone}</div>
-                    </td>
-
-                    <td className="p-3.5 max-w-xs">
-                      <div className="font-medium text-slate-800">{b.department}</div>
-                      <div className="text-slate-500 text-[11px] line-clamp-2 mt-0.5" title={b.reason}>
-                        {b.reason}
+          return (
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
+                    <th className={`${headerPadding} w-10 text-center`}>
+                      <input
+                        type="checkbox"
+                        checked={pendingInView.length > 0 && isAllPendingSelected}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate = isSomePendingSelected;
+                          }
+                        }}
+                        disabled={pendingInView.length === 0}
+                        onChange={handleToggleSelectAll}
+                        className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="เลือกคำขอรออนุมัติทั้งหมด"
+                      />
+                    </th>
+                    <th
+                      onClick={toggleSortOrder}
+                      className={`${headerPadding} cursor-pointer hover:bg-slate-100/90 transition-colors select-none group`}
+                      title="คลิกเพื่อสลับการเรียงลำดับวันที่ (ใหม่สุด / เก่าสุด)"
+                    >
+                      <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+                        <span>วันที่ & เวลา</span>
+                        <span className="text-orange-600 transition-transform group-hover:scale-110">
+                          {sortOrder === 'desc' ? (
+                            <ArrowDownWideNarrow className="w-4 h-4" />
+                          ) : (
+                            <ArrowUpNarrowWide className="w-4 h-4" />
+                          )}
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-500 group-hover:text-orange-600">
+                          ({sortOrder === 'desc' ? 'ใหม่สุด' : 'เก่าสุด'})
+                        </span>
                       </div>
-                      {b.rejectionReason && (
-                        <div className="text-rose-700 text-[10px] mt-1 bg-rose-50 p-1.5 rounded-lg border border-rose-200">
-                          เหตุผลที่ปฏิเสธ: {b.rejectionReason}
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="p-3.5">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs ${
-                          b.status === 'APPROVED'
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : b.status === 'PENDING'
-                            ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                            : 'bg-rose-50 text-rose-800 border border-rose-300'
+                    </th>
+                    <th className={headerPadding}>ผู้จอง & ข้อมูลติดต่อ</th>
+                    {preferences.visibleColumns.studentId && (
+                      <th className={headerPadding}>รหัสนักศึกษา</th>
+                    )}
+                    {preferences.visibleColumns.department && (
+                      <th className={headerPadding}>สังกัด / หน่วยงาน</th>
+                    )}
+                    {preferences.visibleColumns.reason && (
+                      <th className={headerPadding}>เหตุผลและวาระ</th>
+                    )}
+                    <th className={headerPadding}>สถานะ</th>
+                    {preferences.visibleColumns.approvedBy && (
+                      <th className={headerPadding}>ผู้พิจารณา</th>
+                    )}
+                    <th className={`${headerPadding} text-right`}>ดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={totalVisibleColSpan} className="p-10 text-center text-slate-400">
+                        กำลังดึงข้อมูลคำขอจองล่าสุด...
+                      </td>
+                    </tr>
+                  ) : filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan={totalVisibleColSpan} className="p-12 text-center text-slate-400">
+                        <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <div>ไม่พบรายการจองตามเงื่อนไขที่เลือก</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBookings.map((b) => (
+                      <tr
+                        key={b.id}
+                        className={`hover:bg-slate-50/70 transition-colors ${
+                          selectedIds.has(b.id) ? 'bg-orange-50/40' : ''
                         }`}
                       >
-                        {b.status === 'APPROVED'
-                          ? 'อนุมัติแล้ว'
-                          : b.status === 'PENDING'
-                          ? 'รออนุมัติ'
-                          : 'ถูกปฏิเสธ'}
-                      </span>
-                    </td>
-
-                    <td className="p-3.5">
-                      {b.approvedBy ? (
-                        <div>
-                          <div className="font-medium text-slate-800">{b.approvedBy.fullName}</div>
-                          {b.approvedAt && (
-                            <div className="text-slate-400 text-[10px] tabular-nums font-mono mt-0.5">
-                              {new Date(b.approvedAt).toLocaleDateString('th-TH')}
-                            </div>
+                        <td className={`${cellPadding} w-10 text-center`}>
+                          {b.status === 'PENDING' ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(b.id)}
+                              onChange={() => handleToggleSelect(b.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                            />
+                          ) : (
+                            <span className="text-slate-300">-</span>
                           )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </td>
+                        </td>
+                        <td className={cellPadding}>
+                          <div className="font-bold text-slate-900 tabular-nums font-mono">
+                            {formatDisplayDate(b.date)}
+                          </div>
+                          <div className="text-slate-600 text-[11px] flex items-center gap-1 mt-0.5 tabular-nums font-mono">
+                            <Clock className="w-3 h-3 text-slate-400" /> {b.startTime} - {b.endTime} น.
+                          </div>
+                          <div className="font-mono text-[10px] text-orange-600 mt-1 bg-orange-50 px-1.5 py-0.5 rounded inline-block border border-orange-200/60">
+                            {b.bookingCode}
+                          </div>
+                        </td>
 
-                    <td className="p-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {b.status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => updateBookingStatus(b.id, 'APPROVED')}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition active-press flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="อนุมัติคำขอ"
-                            >
-                              <Check className="w-3.5 h-3.5" /> อนุมัติ
-                            </button>
-                            <button
-                              onClick={() => {
-                                setRejectingBooking(b);
-                                setRejectionReasonInput('');
-                              }}
-                              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition active-press flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="ปฏิเสธคำขอ"
-                            >
-                              <X className="w-3.5 h-3.5" /> ปฏิเสธ
-                            </button>
-                          </>
+                        <td className={cellPadding}>
+                          <div className="font-semibold text-slate-900 text-xs">{b.fullName}</div>
+                          <div className="text-slate-400 text-[10px] mt-0.5">โทร: {b.phone}</div>
+                        </td>
+
+                        {preferences.visibleColumns.studentId && (
+                          <td className={cellPadding}>
+                            <span className="font-mono text-slate-700 text-xs">{b.studentId || '-'}</span>
+                          </td>
                         )}
 
-                        {b.status !== 'PENDING' && (
-                          <button
-                            onClick={() => updateBookingStatus(b.id, 'PENDING')}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-medium transition active-press flex items-center gap-1 cursor-pointer"
-                            title="คืนสถานะเป็นรออนุมัติ"
+                        {preferences.visibleColumns.department && (
+                          <td className={cellPadding}>
+                            <span className="font-medium text-slate-800 text-xs">{b.department || '-'}</span>
+                          </td>
+                        )}
+
+                        {preferences.visibleColumns.reason && (
+                          <td className={`${cellPadding} max-w-xs`}>
+                            <div className="text-slate-600 text-[11px] line-clamp-2" title={b.reason}>
+                              {b.reason}
+                            </div>
+                            {b.rejectionReason && (
+                              <div className="text-rose-700 text-[10px] mt-1 bg-rose-50 p-1.5 rounded-lg border border-rose-200">
+                                เหตุผลที่ปฏิเสธ: {b.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                        )}
+
+                        <td className={cellPadding}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs ${
+                              b.status === 'APPROVED'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                                : b.status === 'PENDING'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                                : 'bg-rose-50 text-rose-800 border border-rose-300'
+                            }`}
                           >
-                            <RotateCcw className="w-3 h-3" /> คืนสถานะ
-                          </button>
+                            {b.status === 'APPROVED'
+                              ? 'อนุมัติแล้ว'
+                              : b.status === 'PENDING'
+                              ? 'รออนุมัติ'
+                              : 'ถูกปฏิเสธ'}
+                          </span>
+                        </td>
+
+                        {preferences.visibleColumns.approvedBy && (
+                          <td className={cellPadding}>
+                            {b.approvedBy ? (
+                              <div>
+                                <div className="font-medium text-slate-800 text-xs">{b.approvedBy.fullName}</div>
+                                {b.approvedAt && (
+                                  <div className="text-slate-400 text-[10px] tabular-nums font-mono mt-0.5">
+                                    {new Date(b.approvedAt).toLocaleDateString('th-TH')}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
                         )}
 
-                        <button
-                          onClick={() => deleteBooking(b.id, b.fullName)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                          title="ลบรายการนี้"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                        <td className={`${cellPadding} text-right whitespace-nowrap`}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {b.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => updateBookingStatus(b.id, 'APPROVED')}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition active-press flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  title="อนุมัติคำขอ"
+                                >
+                                  <Check className="w-3.5 h-3.5" /> อนุมัติ
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setRejectingBooking(b);
+                                    setRejectionReasonInput('');
+                                  }}
+                                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition active-press flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  title="ปฏิเสธคำขอ"
+                                >
+                                  <X className="w-3.5 h-3.5" /> ปฏิเสธ
+                                </button>
+                              </>
+                            )}
+
+                            {b.status !== 'PENDING' && (
+                              <button
+                                onClick={() => updateBookingStatus(b.id, 'PENDING')}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-medium transition active-press flex items-center gap-1 cursor-pointer"
+                                title="คืนสถานะเป็นรออนุมัติ"
+                              >
+                                <RotateCcw className="w-3 h-3" /> คืนสถานะ
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => deleteBooking(b.id, b.fullName)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                              title="ลบรายการนี้"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
       )}
 
@@ -1235,6 +1412,14 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Per-Admin Dashboard Customizer Modal */}
+      <DashboardCustomizerModal
+        isOpen={isCustomizerOpen}
+        onClose={() => setIsCustomizerOpen(false)}
+        preferences={preferences}
+        onSave={handleSavePreferences}
+      />
     </div>
   );
 }

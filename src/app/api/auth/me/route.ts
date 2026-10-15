@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { DEFAULT_USER_PREFERENCES, mergeUserPreferences } from '@/lib/user-preferences';
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
       isActive: true,
       googleId: true,
       googleEmail: true,
+      preferences: true,
     },
   });
 
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
       role: user.role,
       isGoogleLinked: !!user.googleId,
       googleEmail: user.googleEmail,
+      preferences: user.preferences ? mergeUserPreferences(user.preferences) : DEFAULT_USER_PREFERENCES,
     },
   });
 }
