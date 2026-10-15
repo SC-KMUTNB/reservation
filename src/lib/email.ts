@@ -3,14 +3,22 @@ import { prisma } from './prisma';
 import { decryptSecret } from './encryption';
 import { recordAuditLog } from './audit';
 import { getAppBaseUrl } from './app-url';
+import { buildGoogleCalendarUrl, generateIcsContent } from './calendar-export';
 
 export type EmailRecipient = string | { name: string; address: string };
+
+export interface EmailAttachment {
+  filename: string;
+  content: string | Buffer;
+  contentType?: string;
+}
 
 export interface EmailOptions {
   to: EmailRecipient | EmailRecipient[];
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 export type EmailRecipientTarget = 'BOTH' | 'ADMIN_ONLY' | 'BOOKING_PERSON';
@@ -138,6 +146,7 @@ async function sendViaSmtp(options: EmailOptions, config: EmailConfig): Promise<
     subject: options.subject,
     text: options.text || options.html.replace(/<[^>]+>/g, ''),
     html: options.html,
+    attachments: options.attachments,
   });
 
   return true;
@@ -357,6 +366,28 @@ export async function notifyUserBookingReceived(booking: {
 
   const baseUrl = await getAppBaseUrl();
   const trackUrl = `${baseUrl}/track?q=${encodeURIComponent(booking.bookingCode)}`;
+  const googleCalUrl = buildGoogleCalendarUrl({
+    bookingCode: booking.bookingCode,
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    fullName: booking.fullName,
+    department: booking.department,
+    reason: booking.reason,
+    status: 'PENDING',
+    trackUrl,
+  });
+  const icsData = generateIcsContent({
+    bookingCode: booking.bookingCode,
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    fullName: booking.fullName,
+    department: booking.department,
+    reason: booking.reason,
+    status: 'PENDING',
+    trackUrl,
+  });
 
   const html = emailWrapper(
     'ระบบได้รับคำขอจองห้องประชุมของท่านแล้ว',
@@ -395,8 +426,11 @@ export async function notifyUserBookingReceived(booking: {
     </table>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${trackUrl}" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block;">
-        ติดตามสถานะคำขอแบบเรียลไทม์ &rarr;
+      <a href="${trackUrl}" style="background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block; margin: 4px;">
+        ติดตามสถานะคำขอ &rarr;
+      </a>
+      <a href="${googleCalUrl}" target="_blank" style="background-color: #ea580c; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block; margin: 4px;">
+        📅 เพิ่มลงใน Google Calendar
       </a>
     </div>
     `
@@ -406,6 +440,13 @@ export async function notifyUserBookingReceived(booking: {
     to: recipients,
     subject: `[สภานักศึกษา มจพ.] ได้รับคำขอจองห้องประชุมแล้ว - ${booking.bookingCode}`,
     html,
+    attachments: [
+      {
+        filename: `${booking.bookingCode}.ics`,
+        content: icsData,
+        contentType: 'text/calendar; charset=utf-8; method=REQUEST',
+      },
+    ],
   });
 
   const recipientsSummary = recipients.map((r) => `${r.name} <${r.address}>`).join(', ');
@@ -536,17 +577,56 @@ export async function notifyUserBookingStatusUpdate(booking: {
     </table>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${trackUrl}" style="background-color: #ea580c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block;">
+      <a href="${trackUrl}" style="background-color: #ea580c; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block; margin: 4px;">
         ดูรายละเอียดและหลักฐานการจอง &rarr;
       </a>
+      ${
+        booking.status === 'APPROVED'
+          ? `<a href="${buildGoogleCalendarUrl({
+              bookingCode: booking.bookingCode,
+              date: booking.date,
+              startTime: booking.startTime,
+              endTime: booking.endTime,
+              fullName: booking.fullName,
+              department: '',
+              reason: '',
+              status: 'APPROVED',
+              trackUrl,
+            })}" target="_blank" style="background-color: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-size: 13px; font-weight: 700; display: inline-block; margin: 4px;">
+              📅 เพิ่มลงใน Google Calendar
+            </a>`
+          : ''
+      }
     </div>
     `
   );
+
+  const attachments =
+    booking.status === 'APPROVED'
+      ? [
+          {
+            filename: `${booking.bookingCode}.ics`,
+            content: generateIcsContent({
+              bookingCode: booking.bookingCode,
+              date: booking.date,
+              startTime: booking.startTime,
+              endTime: booking.endTime,
+              fullName: booking.fullName,
+              department: '',
+              reason: '',
+              status: 'APPROVED',
+              trackUrl,
+            }),
+            contentType: 'text/calendar; charset=utf-8; method=REQUEST',
+          },
+        ]
+      : undefined;
 
   const res = await sendEmail({
     to: recipients,
     subject: `[อัปเดตสถานะ] คำขอจองห้องประชุม ${booking.bookingCode} - ${booking.status}`,
     html,
+    attachments,
   });
 
   const recipientsSummary = recipients.map((r) => `${r.name} <${r.address}>`).join(', ');

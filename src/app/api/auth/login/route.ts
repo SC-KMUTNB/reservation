@@ -3,9 +3,23 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createSessionToken } from '@/lib/auth';
 import { recordAuditLog } from '@/lib/audit';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const limitResult = checkRateLimit(`login:${ip}`, 5, 15 * 60 * 1000);
+    if (!limitResult.allowed) {
+      await recordAuditLog({
+        action: 'LOGIN_RATE_LIMITED',
+        details: `จำกัดอัตราการเข้าสู่ระบบ: พยายามเข้าสู่ระบบเกิน 5 ครั้งใน 15 นาทีจาก IP ${ip}`,
+        actorName: 'ระบบรักษาความปลอดภัย',
+        actorRole: 'SYSTEM',
+        ipAddress: ip,
+      });
+      return rateLimitResponse(limitResult);
+    }
+
     const body = await request.json();
     const { email, username, identifier, password } = body;
     const loginTarget = (identifier || username || email || '').trim();
@@ -50,7 +64,6 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
 
     await recordAuditLog({
       action: 'ADMIN_LOGIN',

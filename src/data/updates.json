@@ -1,5 +1,58 @@
 [
   {
+    "version": "v1.7.0",
+    "date": "2026-10-14",
+    "type": "minor",
+    "title": "ยกระดับความปลอดภัย (Security Hardening), ระบบช่วยเหลือผู้ใช้ (Self-Service) และการจัดการห้องประชุมแบบไดนามิก",
+    "summary": "อัปเกรดระบบครั้งใหญ่ครอบคลุม 4 ด้าน: ความปลอดภัยระดับ Edge Middleware และ Sliding-window IP Rate Limiting, ระบบยกเลิกการจองและส่งออกปฏิทินด้วยตนเอง, การจัดการห้องประชุม อุปกรณ์ วันปิดทำการ และการแจ้งเตือน Webhook แบบเรียลไทม์ พร้อมปรับปรุงโครงสร้างโค้ดและ CI/CD",
+    "changes": [
+      {
+        "category": "security",
+        "description": "เพิ่ม Edge Middleware ปกป้องเส้นทาง /admin และ /m/admin ด้วย jose jwtVerify พร้อมระบบ Sliding-window IP Rate Limiting และตรวจสอบความลับ JWT_SECRET / ENCRYPTION_SECRET อย่างเข้มงวด"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบยกเลิกการจองด้วยตนเองสำหรับนักศึกษา (Self-Service Booking Cancellation) พร้อมการยืนยันตัวตนด้วยเลขท้ายเบอร์โทรศัพท์ 4 หลัก"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบส่งออกปฏิทินในคลิกเดียว (One-Click Calendar Export) รองรับทั้ง Google Calendar Deep Link และการดาวน์โหลดไฟล์ .ics ตามมาตรฐาน RFC 5545 พร้อมแนบในอีเมลอัตโนมัติ"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบจดจำข้อมูลผู้ขอจอง (Opt-in Profile Memory) บันทึกข้อมูลลงใน localStorage เพื่ออำนวยความสะดวกในการจองครั้งถัดไป"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบตั้งค่าห้องประชุมแบบไดนามิก (Facility Config) กำหนดเวลาเปิด-ปิด ความยาวรอบจอง อุปกรณ์ให้บริการ วันปิดทำการ และกฎระเบียบจากหน้าแอดมิน"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบเช็กอินเข้าใช้งานห้องประชุมด้วย QR Code ณ หน้าห้องประชุม พร้อมตรวจสอบสถานะแบบเรียลไทม์"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบแจ้งเตือนแบบเรียลไทม์ผ่าน Webhook รองรับทั้ง Discord Webhook และ LINE Messaging API พร้อมระบบทดสอบส่ง Webhook ในหน้าแอดมิน"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบตรวจจับและแจ้งเตือนคำขอรออนุมัติที่เวลาชนกัน พร้อมตัวเลือกปฏิเสธคำขอที่ชนกันโดยอัตโนมัติในขั้นตอนอนุมัติ"
+      },
+      {
+        "category": "improve",
+        "description": "ปรับปรุงสถาปัตยกรรม Non-blocking Side Effects ด้วย after() จาก next/server, แยก Subcomponents ของหน้าจองห้องประชุมให้กระชับ (< 250 บรรทัด) และรวมหน้า Mobile (/m/*) ให้ใช้คอมโพเนนต์หลักร่วมกัน"
+      },
+      {
+        "category": "improve",
+        "description": "เพิ่มปุ่มและ API ซิงก์ข้อมูลหรือส่งอีเมลซ้ำ (Retry Sync) สำหรับรายการที่เกิดข้อผิดพลาด พร้อมบันทึกประวัติการทำงานลง Audit Logs"
+      },
+      {
+        "category": "security",
+        "description": "เพิ่ม Composite Indexing ในฐานข้อมูล Prisma (date+status, date+time) เพื่อความรวดเร็วในการตรวจสอบเวลาทับซ้อน และติดตั้ง GitHub Actions CI ตรวจสอบคุณภาพโค้ดอัตโนมัติ"
+      }
+    ]
+  },
+  {
     "version": "v1.6.1",
     "date": "2026-10-10",
     "type": "minor",

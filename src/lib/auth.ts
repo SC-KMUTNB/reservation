@@ -2,12 +2,19 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('SECURITY ERROR: JWT_SECRET environment variable must be set in production.');
+const isTest = process.env.NODE_ENV === 'test';
+
+if (!isTest) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'SECURITY ERROR: JWT_SECRET environment variable is missing or shorter than 32 characters. Please refer to .env.example to set a secure secret.'
+    );
+  }
 }
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'dev-fallback-secret-key-kmutnb-reservation-only'
+export const SECRET_KEY = new TextEncoder().encode(
+  process.env.JWT_SECRET || (isTest ? 'test-fallback-secret-key-kmutnb-reservation-32chars!' : '')
 );
 
 export interface SessionUser {

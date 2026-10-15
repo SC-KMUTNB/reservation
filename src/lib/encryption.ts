@@ -4,11 +4,21 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits recommended for GCM
 const PREFIX = 'enc:v1:';
 
+const isTest = process.env.NODE_ENV === 'test';
+
+if (!isTest) {
+  const encSecret = process.env.ENCRYPTION_SECRET;
+  if (!encSecret || encSecret.length < 32) {
+    throw new Error(
+      'SECURITY ERROR: ENCRYPTION_SECRET environment variable is missing or shorter than 32 characters. Please refer to .env.example to set a secure secret.'
+    );
+  }
+}
+
 function getEncryptionKey(): Buffer {
   const secret =
     process.env.ENCRYPTION_SECRET ||
-    process.env.JWT_SECRET ||
-    'kmutnb-council-reservation-secret-encryption-key-2026';
+    (isTest ? 'test-fallback-encryption-secret-key-kmutnb-32chars' : '');
   // Use SHA-256 to ensure a solid 32-byte key
   return crypto.createHash('sha256').update(secret).digest();
 }
@@ -84,4 +94,7 @@ export function maskSecret(value?: string | null): string {
 export const SENSITIVE_SETTING_KEYS = [
   'smtp_pass',
   'google_private_key',
+  'webhook_discord_url',
+  'webhook_line_token',
+  'webhook_line_target_id',
 ];
