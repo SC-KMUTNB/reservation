@@ -67,6 +67,18 @@ export default function AdminDashboardPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Batch action states
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchApproveModalOpen, setIsBatchApproveModalOpen] = useState(false);
+  const [isBatchRejectModalOpen, setIsBatchRejectModalOpen] = useState(false);
+  const [batchRejectionReason, setBatchRejectionReason] = useState('');
+  const [conflictResults, setConflictResults] = useState<{
+    approvedCount: number;
+    conflictCount: number;
+    conflicts: Array<{ id: string; bookingCode: string; reason: string }>;
+  } | null>(null);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem('admin_dashboard_sort_order');
     if (saved === 'asc' || saved === 'desc') {
@@ -195,6 +207,82 @@ export default function AdminDashboardPage() {
     } catch (e) {
       console.error(e);
       setActionError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
+  };
+
+  const pendingInView = filteredBookings.filter((b) => b.status === 'PENDING');
+  const isAllPendingSelected =
+    pendingInView.length > 0 && pendingInView.every((b) => selectedIds.has(b.id));
+  const isSomePendingSelected =
+    pendingInView.some((b) => selectedIds.has(b.id)) && !isAllPendingSelected;
+
+  const handleToggleSelectAll = () => {
+    const next = new Set(selectedIds);
+    if (isAllPendingSelected) {
+      pendingInView.forEach((b) => next.delete(b.id));
+    } else {
+      pendingInView.forEach((b) => next.add(b.id));
+    }
+    setSelectedIds(next);
+  };
+
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleBatchAction = async (action: 'APPROVE' | 'REJECT') => {
+    if (selectedIds.size === 0) return;
+    setIsBatchProcessing(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      const res = await fetch('/api/admin/bookings/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          bookingIds: Array.from(selectedIds),
+          rejectionReason: action === 'REJECT' ? batchRejectionReason : undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || 'เกิดข้อผิดพลาดในการดำเนินการแบบกลุ่ม');
+        return;
+      }
+
+      if (action === 'APPROVE') {
+        setIsBatchApproveModalOpen(false);
+        if (data.conflictCount > 0) {
+          setConflictResults({
+            approvedCount: data.approvedCount,
+            conflictCount: data.conflictCount,
+            conflicts: data.conflicts || [],
+          });
+        } else {
+          setActionSuccess(`อนุมัติคำขอที่เลือกเรียบร้อยแล้ว (${data.approvedCount} รายการ)`);
+        }
+      } else {
+        setIsBatchRejectModalOpen(false);
+        setActionSuccess(`ปฏิเสธคำขอที่เลือกเรียบร้อยแล้ว (${data.rejectedCount} รายการ)`);
+      }
+
+      setSelectedIds(new Set());
+      setBatchRejectionReason('');
+      fetchBookings();
+    } catch (err) {
+      console.error(err);
+      setActionError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsBatchProcessing(false);
     }
   };
 
@@ -398,6 +486,21 @@ export default function AdminDashboardPage() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
+                <th className="p-3.5 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={pendingInView.length > 0 && isAllPendingSelected}
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate = isSomePendingSelected;
+                      }
+                    }}
+                    disabled={pendingInView.length === 0}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="เลือกคำขอรออนุมัติทั้งหมด"
+                  />
+                </th>
                 <th
                   onClick={toggleSortOrder}
                   className="p-3.5 cursor-pointer hover:bg-slate-100/90 transition-colors select-none group"
@@ -427,20 +530,37 @@ export default function AdminDashboardPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-slate-400">
+                  <td colSpan={7} className="p-10 text-center text-slate-400">
                     กำลังดึงข้อมูลคำขอจองล่าสุด...
                   </td>
                 </tr>
               ) : filteredBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-slate-400">
+                  <td colSpan={7} className="p-12 text-center text-slate-400">
                     <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <div>ไม่พบรายการจองตามเงื่อนไขที่เลือก</div>
                   </td>
                 </tr>
               ) : (
                 filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr
+                    key={b.id}
+                    className={`hover:bg-slate-50/70 transition-colors ${
+                      selectedIds.has(b.id) ? 'bg-orange-50/40' : ''
+                    }`}
+                  >
+                    <td className="p-3.5 w-10 text-center">
+                      {b.status === 'PENDING' ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(b.id)}
+                          onChange={() => handleToggleSelect(b.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                        />
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
+                    </td>
                     <td className="p-3.5">
                       <div className="font-bold text-slate-900 tabular-nums font-mono">
                         {formatDisplayDate(b.date)}
@@ -616,6 +736,268 @@ export default function AdminDashboardPage() {
                 className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer"
               >
                 ยืนยันการปฏิเสธ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Batch Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white backdrop-blur-md px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+            <span className="text-xs font-bold text-slate-200 whitespace-nowrap">
+              เลือก {selectedIds.size} รายการ
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsBatchApproveModalOpen(true)}
+            disabled={isBatchProcessing}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs active-press cursor-pointer"
+          >
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>อนุมัติที่เลือก</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setBatchRejectionReason('');
+              setIsBatchRejectModalOpen(true);
+            }}
+            disabled={isBatchProcessing}
+            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs active-press cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>ปฏิเสธที่เลือก</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={isBatchProcessing}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-medium transition cursor-pointer"
+          >
+            ยกเลิก
+          </button>
+        </div>
+      )}
+
+      {/* Batch Approve Confirmation Modal */}
+      {isBatchApproveModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    ยืนยันอนุมัติคำขอแบบกลุ่ม
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    จำนวนที่เลือกทั้งหมด {selectedIds.size} รายการ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchApproveModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-xs text-amber-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>การตรวจสอบข้อขัดแย้งของช่วงเวลา (Conflict Protection)</span>
+              </div>
+              <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                ระบบจะตรวจสอบเวลาซ้อนทับอัตโนมัติ หากมีรายการที่ชนกับรายการที่อนุมัติไปแล้ว หรือชนกันเองในกลุ่มที่เลือก
+                ระบบจะอนุมัติเฉพาะรายการที่ไม่ชน และแจ้งเตือนรายการที่ขัดแย้งให้ทราบ
+              </p>
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100 text-xs">
+              {bookings
+                .filter((b) => selectedIds.has(b.id))
+                .map((b) => (
+                  <div key={b.id} className="pt-1.5 first:pt-0 flex items-center justify-between text-slate-700">
+                    <div>
+                      <span className="font-semibold text-slate-900">{b.fullName}</span>
+                      <span className="text-slate-400 font-mono text-[11px] ml-1.5">({b.bookingCode})</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">
+                      {formatDisplayDate(b.date)} | {b.startTime} - {b.endTime}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsBatchApproveModalOpen(false)}
+                disabled={isBatchProcessing}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchAction('APPROVE')}
+                disabled={isBatchProcessing}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition active-press shadow-warm-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                {isBatchProcessing ? (
+                  <span>กำลังดำเนินการ...</span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>ยืนยันอนุมัติ ({selectedIds.size} รายการ)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Reject Modal */}
+      {isBatchRejectModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    ระบุเหตุผลในการปฏิเสธแบบกลุ่ม
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    จำนวนที่เลือกทั้งหมด {selectedIds.size} รายการ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchRejectModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">
+                เลือกเหตุผลสำเร็จรูป หรือพิมพ์ระบุเอง:
+              </label>
+              <div className="flex flex-col gap-1.5">
+                {PRESET_REJECTION_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setBatchRejectionReason(reason)}
+                    className="text-left text-xs bg-slate-50 hover:bg-orange-50 hover:text-orange-700 border border-slate-200 hover:border-orange-300 p-2.5 rounded-xl transition cursor-pointer active-press"
+                  >
+                    • {reason}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                rows={3}
+                value={batchRejectionReason}
+                onChange={(e) => setBatchRejectionReason(e.target.value)}
+                placeholder="ระบุเหตุผลที่จะส่งแจ้งเตือนทางอีเมลไปยังผู้ยื่นคำขอทั้งหมด..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
+              ></textarea>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsBatchRejectModalOpen(false)}
+                disabled={isBatchProcessing}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchAction('REJECT')}
+                disabled={isBatchProcessing}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition active-press shadow-warm-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                {isBatchProcessing ? (
+                  <span>กำลังดำเนินการ...</span>
+                ) : (
+                  <>
+                    <X className="w-4 h-4" />
+                    <span>ยืนยันปฏิเสธ ({selectedIds.size} รายการ)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Result Alert Modal */}
+      {conflictResults && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  ผลลัพธ์การอนุมัติแบบกลุ่ม
+                </h3>
+                <p className="text-xs text-slate-500">
+                  อนุมัติสำเร็จ {conflictResults.approvedCount} รายการ | พบข้อขัดแย้ง {conflictResults.conflictCount} รายการ
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="text-xs font-semibold text-rose-800 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>รายการที่เวลาซ้อนทับ (คงสถานะรออนุมัติเพื่อตรวจสอบ):</span>
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                {conflictResults.conflicts.map((c) => (
+                  <div
+                    key={c.id}
+                    className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-xs text-rose-900 space-y-1"
+                  >
+                    <div className="font-bold font-mono text-rose-800">
+                      รหัสจอง: {c.bookingCode}
+                    </div>
+                    <div className="text-[11px] text-rose-700 leading-relaxed">
+                      {c.reason}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConflictResults(null)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition active-press cursor-pointer"
+              >
+                รับทราบและปิด
               </button>
             </div>
           </div>
