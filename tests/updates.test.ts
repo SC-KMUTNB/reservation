@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import updatesData from '@/data/updates.json';
 import {
   classifyVersion,
   normalizeCategory,
@@ -10,19 +9,6 @@ import {
 } from '@/lib/changelog';
 import { GET as getChangelog } from '@/app/api/changelog/route';
 import { NextRequest } from 'next/server';
-
-describe('updates.json validation', () => {
-  test('updates.json is valid and contains latest updates', () => {
-    expect(Array.isArray(updatesData)).toBe(true);
-    expect(updatesData.length).toBeGreaterThan(0);
-
-    const latest = updatesData[0];
-    expect(latest.version).toMatch(/^v\d+\.\d+\.\d+$/);
-    expect(latest.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(latest.title.length).toBeGreaterThan(0);
-    expect(latest.changes.length).toBeGreaterThan(0);
-  });
-});
 
 describe('SemVer Classification (classifyVersion)', () => {
   test('classifies major versions correctly', () => {
@@ -35,6 +21,7 @@ describe('SemVer Classification (classifyVersion)', () => {
     expect(classifyVersion('v1.1.0')).toBe('minor');
     expect(classifyVersion('v1.7.0')).toBe('minor');
     expect(classifyVersion('v1.8.0')).toBe('minor');
+    expect(classifyVersion('v1.9.0')).toBe('minor');
   });
 
   test('classifies patch versions correctly', () => {
@@ -70,15 +57,15 @@ describe('Category Normalization (normalizeCategory)', () => {
 describe('parseGitHubRelease and formatUpdateToMarkdown', () => {
   test('parses markdown release body into structured UpdateRecord', () => {
     const mockRelease: GitHubRelease = {
-      tag_name: 'v1.8.0',
-      name: 'v1.8.0: Quality-of-Life Update',
-      published_at: '2026-10-16T12:00:00Z',
-      html_url: 'https://github.com/SC-KMUTNB/reservation/releases/tag/v1.8.0',
+      tag_name: 'v1.9.0',
+      name: 'v1.9.0: Dynamic GitHub Changelog Suite',
+      published_at: '2026-10-17T12:00:00Z',
+      html_url: 'https://github.com/SC-KMUTNB/reservation/releases/tag/v1.9.0',
       body: `This is the overview summary of the release.
 
 ### ✨ ฟีเจอร์ใหม่ (Features)
-- เพิ่มระบบปรับแต่งแดชบอร์ดส่วนบุคคล
-- มุมมองไทม์ไลน์และปฏิทินแอดมิน
+- ระบบดึงและแคชประวัติการอัปเดตจาก GitHub Releases
+- ระบบจำแนกและกรองเวอร์ชันตามมาตรฐาน SemVer 3 ระดับ
 
 ### 🐛 แก้ไขข้อผิดพลาด (Bug Fixes)
 - แก้ไขปัญหาเวลาชนกันในการจอง
@@ -86,15 +73,15 @@ describe('parseGitHubRelease and formatUpdateToMarkdown', () => {
     };
 
     const parsed = parseGitHubRelease(mockRelease);
-    expect(parsed.version).toBe('v1.8.0');
+    expect(parsed.version).toBe('v1.9.0');
     expect(parsed.type).toBe('minor');
     expect(parsed.summary).toContain('This is the overview summary');
     expect(parsed.changes.length).toBe(3);
     expect(parsed.changes[0].category).toBe('feat');
-    expect(parsed.changes[0].description).toBe('เพิ่มระบบปรับแต่งแดชบอร์ดส่วนบุคคล');
+    expect(parsed.changes[0].description).toBe('ระบบดึงและแคชประวัติการอัปเดตจาก GitHub Releases');
     expect(parsed.changes[2].category).toBe('fix');
     expect(parsed.changes[2].description).toBe('แก้ไขปัญหาเวลาชนกันในการจอง');
-    expect(parsed.htmlUrl).toBe('https://github.com/SC-KMUTNB/reservation/releases/tag/v1.8.0');
+    expect(parsed.htmlUrl).toBe('https://github.com/SC-KMUTNB/reservation/releases/tag/v1.9.0');
   });
 
   test('formats UpdateRecord into markdown and can be re-parsed', () => {
@@ -131,7 +118,7 @@ describe('parseGitHubRelease and formatUpdateToMarkdown', () => {
 });
 
 describe('GET /api/changelog route handler', () => {
-  test('returns 200 and a list of updates from fallback or github', async () => {
+  test('returns 200 and a list of updates from GitHub Releases API', async () => {
     const req = new NextRequest('http://localhost:3000/api/changelog');
     const response = await getChangelog(req);
 
@@ -140,9 +127,13 @@ describe('GET /api/changelog route handler', () => {
     expect(body.success).toBe(true);
     expect(Array.isArray(body.updates)).toBe(true);
     expect(body.updates.length).toBeGreaterThan(0);
-    expect(['github', 'fallback']).toContain(body.source);
+    expect(body.source).toBe('github');
 
-    // Verify SemVer normalization on returned updates
+    // Verify SemVer classification on live releases
+    const v190 = body.updates.find((u: any) => u.version === 'v1.9.0');
+    if (v190) {
+      expect(v190.type).toBe('minor');
+    }
     const v161 = body.updates.find((u: any) => u.version === 'v1.6.1');
     if (v161) {
       expect(v161.type).toBe('patch');

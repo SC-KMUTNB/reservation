@@ -3,11 +3,13 @@ import {
   UpdateRecord,
   GitHubRelease,
   parseGitHubRelease,
-  classifyVersion,
 } from '@/lib/changelog';
-import fallbackUpdates from '@/data/updates.json';
 
 const DEFAULT_REPO = 'SC-KMUTNB/reservation';
+
+// In-memory backup cache across cold reloads
+let lastCachedUpdates: UpdateRecord[] = [];
+let lastCachedAt: string | null = null;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -44,13 +46,16 @@ export async function GET(request: NextRequest) {
         const publishedReleases = releases.filter((r) => !r.draft);
         const updates: UpdateRecord[] = publishedReleases.map(parseGitHubRelease);
 
+        lastCachedUpdates = updates;
+        lastCachedAt = new Date().toISOString();
+
         return NextResponse.json(
           {
             success: true,
             source: 'github',
             repo,
             updates,
-            cachedAt: new Date().toISOString(),
+            cachedAt: lastCachedAt,
           },
           {
             headers: {
@@ -61,22 +66,33 @@ export async function GET(request: NextRequest) {
           }
         );
       }
+    } else {
+      console.warn(`GitHub API responded with status ${res.status}: ${res.statusText}`);
     }
   } catch (error) {
     console.error('Failed to fetch changelog from GitHub Releases:', error);
   }
 
-  // Fallback to local updates.json with normalized SemVer classification
-  const normalizedFallback: UpdateRecord[] = (fallbackUpdates as any[]).map((item) => ({
-    ...item,
-    type: classifyVersion(item.version),
-  }));
+  // Return last in-memory cached updates if available
+  if (lastCachedUpdates.length > 0) {
+    return NextResponse.json({
+      success: true,
+      source: 'github',
+      repo,
+      updates: lastCachedUpdates,
+      cachedAt: lastCachedAt,
+    });
+  }
 
-  return NextResponse.json({
-    success: true,
-    source: 'fallback',
-    repo,
-    updates: normalizedFallback,
-    cachedAt: new Date().toISOString(),
-  });
+  return NextResponse.json(
+    {
+      success: false,
+      source: 'github',
+      repo,
+      updates: [],
+      error: 'Unable to load releases from GitHub.',
+      cachedAt: new Date().toISOString(),
+    },
+    { status: 502 }
+  );
 }
