@@ -109,6 +109,7 @@ export function getWeekDates(d: Date): Date[] {
 
 // Assign bookings to parallel lanes if overlapping
 export function assignLanes(items: AdminBooking[]): AdminBooking[][] {
+  if (!Array.isArray(items) || items.length === 0) return [];
   const sorted = [...items].sort((a, b) => {
     const diff = parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime);
     if (diff !== 0) return diff;
@@ -222,7 +223,8 @@ export default function AdminScheduleTimeline({
 
   // Filter bookings for a given date string (ignoring cancelled bookings for cleaner timeline, or showing them)
   const getBookingsForDate = (dateStr: string) => {
-    return bookings.filter(
+    const list = Array.isArray(bookings) ? bookings : [];
+    return list.filter(
       (b) => b.date === dateStr && b.status !== 'CANCELLED' && b.status !== 'REJECTED'
     );
   };

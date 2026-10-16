@@ -72,7 +72,7 @@ function isTimeOverlapping(start1: string, end1: string, start2: string, end2: s
 }
 
 function getConflictingPendingBookings(current: AdminBooking, allBookings: AdminBooking[]): AdminBooking[] {
-  if (current.status !== 'PENDING') return [];
+  if (current.status !== 'PENDING' || !Array.isArray(allBookings)) return [];
   return allBookings.filter(
     (b) =>
       b.id !== current.id &&
@@ -163,8 +163,9 @@ export default function AdminDashboardPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setPreferences(data.preferences);
-        const mapped = data.preferences.defaultView === 'CALENDAR' || data.preferences.defaultView === 'MONTH' ? 'MONTH' : data.preferences.defaultView === 'TIMELINE' ? 'TIMELINE' : 'TABLE';
+        const merged = mergeUserPreferences(data.preferences);
+        setPreferences(merged);
+        const mapped = merged.defaultView === 'CALENDAR' || merged.defaultView === 'MONTH' ? 'MONTH' : merged.defaultView === 'TIMELINE' ? 'TIMELINE' : 'TABLE';
         setViewMode(mapped);
         setActionSuccess('บันทึกการตั้งค่าส่วนบุคคลเรียบร้อยแล้ว');
         setTimeout(() => setActionSuccess(null), 3500);
@@ -192,7 +193,7 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    let result = [...bookings];
+    let result = Array.isArray(bookings) ? [...bookings] : [];
 
     if (statusFilter === 'TODAY') {
       result = result.filter((b) => b.date === todayStr);
@@ -237,7 +238,8 @@ export default function AdminDashboardPage() {
       const res = await fetch('/api/bookings');
       if (res.ok) {
         const data = await res.json();
-        setBookings(data);
+        const list = Array.isArray(data) ? data : (data.bookings || []);
+        setBookings(Array.isArray(list) ? list : []);
       }
     } catch {
       setActionError('ไม่สามารถโหลดข้อมูลคำขอจองห้องประชุมได้');
@@ -437,35 +439,36 @@ export default function AdminDashboardPage() {
   };
 
   const stats = useMemo(() => {
-    const total = bookings.length;
-    const pending = bookings.filter((b) => b.status === 'PENDING').length;
-    const approved = bookings.filter((b) => b.status === 'APPROVED').length;
-    const rejected = bookings.filter((b) => b.status === 'REJECTED').length;
-    const today = bookings.filter((b) => b.date === todayStr).length;
+    const list = Array.isArray(bookings) ? bookings : [];
+    const total = list.length;
+    const pending = list.filter((b) => b.status === 'PENDING').length;
+    const approved = list.filter((b) => b.status === 'APPROVED').length;
+    const rejected = list.filter((b) => b.status === 'REJECTED').length;
+    const today = list.filter((b) => b.date === todayStr).length;
 
     const now = new Date();
     const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    const urgent = bookings.filter((b) => {
+    const urgent = list.filter((b) => {
       if (b.status !== 'PENDING') return false;
       const bDate = new Date(`${b.date}T${b.startTime}:00`);
       return bDate >= now && bDate <= in48h;
     }).length;
 
     const weekDates = getWeekDates(now).map(toDateString);
-    const weekly = bookings.filter((b) => weekDates.includes(b.date)).length;
+    const weekly = list.filter((b) => weekDates.includes(b.date)).length;
 
     return { total, pending, approved, rejected, today, urgent, weekly };
   }, [bookings, todayStr]);
 
-  const cellPadding = preferences.tableDensity === 'compact' ? 'py-2 px-3 text-xs' : 'p-3.5';
+  const cellPadding = preferences?.tableDensity === 'compact' ? 'py-2 px-3 text-xs' : 'p-3.5';
 
   const totalVisibleColSpan =
     3 +
-    (preferences.visibleColumns.studentId ? 1 : 0) +
-    (preferences.visibleColumns.department ? 1 : 0) +
-    (preferences.visibleColumns.reason ? 1 : 0) +
+    (preferences?.visibleColumns?.studentId ? 1 : 0) +
+    (preferences?.visibleColumns?.department ? 1 : 0) +
+    (preferences?.visibleColumns?.reason ? 1 : 0) +
     1 +
-    (preferences.visibleColumns.approvedBy ? 1 : 0) +
+    (preferences?.visibleColumns?.approvedBy ? 1 : 0) +
     1;
 
   return (
@@ -512,7 +515,7 @@ export default function AdminDashboardPage() {
 
       {/* Metric Cards Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {preferences.visibleWidgets.includes('PENDING') && (
+        {preferences?.visibleWidgets?.includes('PENDING') && (
           <div className="bg-white p-5 rounded-3xl border border-amber-200/80 bg-amber-50/20 shadow-warm-xs">
             <div className="flex justify-between items-center text-amber-800 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
@@ -526,7 +529,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {preferences.visibleWidgets.includes('TODAY') && (
+        {preferences?.visibleWidgets?.includes('TODAY') && (
           <div className="bg-white p-5 rounded-3xl border border-blue-200/80 bg-blue-50/20 shadow-warm-xs">
             <div className="flex justify-between items-center text-blue-800 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
@@ -540,7 +543,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {preferences.visibleWidgets.includes('URGENT') && (
+        {preferences?.visibleWidgets?.includes('URGENT') && (
           <div className="bg-white p-5 rounded-3xl border border-rose-200/80 bg-rose-50/20 shadow-warm-xs">
             <div className="flex justify-between items-center text-rose-800 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
@@ -554,7 +557,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {preferences.visibleWidgets.includes('WEEKLY') && (
+        {preferences?.visibleWidgets?.includes('WEEKLY') && (
           <div className="bg-white p-5 rounded-3xl border border-emerald-200/80 bg-emerald-50/20 shadow-warm-xs">
             <div className="flex justify-between items-center text-emerald-800 text-xs font-semibold">
               <span className="flex items-center gap-1.5">
@@ -728,11 +731,11 @@ export default function AdminDashboardPage() {
                   </th>
                   <th className="py-3 px-3">วันและเวลาที่จอง</th>
                   <th className="py-3 px-3">ผู้ขอใช้บริการ</th>
-                  {preferences.visibleColumns.studentId && <th className="py-3 px-3">รหัสนักศึกษา</th>}
-                  {preferences.visibleColumns.department && <th className="py-3 px-3">หน่วยงาน / สังกัด</th>}
-                  {preferences.visibleColumns.reason && <th className="py-3 px-3">เหตุผลและวาระ</th>}
+                  {preferences?.visibleColumns?.studentId && <th className="py-3 px-3">รหัสนักศึกษา</th>}
+                  {preferences?.visibleColumns?.department && <th className="py-3 px-3">หน่วยงาน / สังกัด</th>}
+                  {preferences?.visibleColumns?.reason && <th className="py-3 px-3">เหตุผลและวาระ</th>}
                   <th className="py-3 px-3">สถานะ</th>
-                  {preferences.visibleColumns.approvedBy && <th className="py-3 px-3">ผู้อนุมัติ</th>}
+                  {preferences?.visibleColumns?.approvedBy && <th className="py-3 px-3">ผู้อนุมัติ</th>}
                   <th className="py-3 px-3 text-right">จัดการ</th>
                 </tr>
               </thead>
@@ -799,19 +802,19 @@ export default function AdminDashboardPage() {
                           <div className="text-slate-400 text-[10px] mt-0.5">โทร: {b.phone}</div>
                         </td>
 
-                        {preferences.visibleColumns.studentId && (
+                        {preferences?.visibleColumns?.studentId && (
                           <td className={cellPadding}>
                             <span className="font-mono text-slate-700 text-xs">{b.studentId || '-'}</span>
                           </td>
                         )}
 
-                        {preferences.visibleColumns.department && (
+                        {preferences?.visibleColumns?.department && (
                           <td className={cellPadding}>
                             <span className="font-medium text-slate-800 text-xs">{b.department || '-'}</span>
                           </td>
                         )}
 
-                        {preferences.visibleColumns.reason && (
+                        {preferences?.visibleColumns?.reason && (
                           <td className={`${cellPadding} max-w-xs`}>
                             <div className="text-slate-600 text-[11px] line-clamp-2" title={b.reason}>
                               {b.reason}
@@ -864,7 +867,7 @@ export default function AdminDashboardPage() {
                           )}
                         </td>
 
-                        {preferences.visibleColumns.approvedBy && (
+                        {preferences?.visibleColumns?.approvedBy && (
                           <td className={cellPadding}>
                             {b.approvedBy ? (
                               <div>

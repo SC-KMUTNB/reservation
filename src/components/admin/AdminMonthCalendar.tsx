@@ -72,7 +72,8 @@ export default function AdminMonthCalendar({
   // Group bookings by date string for fast lookup
   const bookingsByDate = useMemo(() => {
     const map = new Map<string, AdminBooking[]>();
-    for (const b of bookings) {
+    const list = Array.isArray(bookings) ? bookings : [];
+    for (const b of list) {
       if (b.status === 'CANCELLED') continue;
       const list = map.get(b.date) || [];
       list.push(b);

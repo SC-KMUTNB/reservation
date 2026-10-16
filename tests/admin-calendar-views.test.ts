@@ -133,4 +133,28 @@ describe('Admin Schedule Timeline Logic', () => {
     expect(lanes[0].map((b) => b.id)).toEqual(['b1', 'b3']);
     expect(lanes[1].map((b) => b.id)).toEqual(['b2']);
   });
+
+  it('handles empty or non-array inputs defensively in assignLanes', () => {
+    expect(assignLanes([])).toEqual([]);
+    expect(assignLanes(null as any)).toEqual([]);
+    expect(assignLanes(undefined as any)).toEqual([]);
+  });
+
+  it('unwraps bookings payload correctly whether array or wrapped in { bookings: [...] }', () => {
+    const rawArray = [{ id: '1', date: '2026-10-16' }];
+    const wrappedObj = { bookings: [{ id: '1', date: '2026-10-16' }] };
+    const emptyObj = {};
+    const nullVal = null;
+
+    const unwrap = (data: any) => {
+      const list = Array.isArray(data) ? data : (data?.bookings || []);
+      return Array.isArray(list) ? list : [];
+    };
+
+    expect(unwrap(rawArray)).toHaveLength(1);
+    expect(unwrap(wrappedObj)).toHaveLength(1);
+    expect(unwrap(emptyObj)).toEqual([]);
+    expect(unwrap(nullVal)).toEqual([]);
+  });
 });
+
