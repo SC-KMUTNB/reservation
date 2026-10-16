@@ -39,7 +39,17 @@ export async function POST(request: NextRequest) {
           { username: cleanTarget },
         ],
       },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        passwordHash: true,
+        role: true,
+        isActive: true,
+      },
     });
+
 
     if (!user || !user.isActive) {
       return NextResponse.json(

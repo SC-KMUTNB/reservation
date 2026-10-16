@@ -146,7 +146,16 @@ export async function GET(request: NextRequest) {
     // 5. Action: LOGIN via Google
     const user = await prisma.user.findUnique({
       where: { googleId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+      },
     });
+
 
     if (!user) {
       return NextResponse.redirect(

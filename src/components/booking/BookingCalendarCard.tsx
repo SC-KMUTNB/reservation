@@ -143,7 +143,9 @@ export default function BookingCalendarCard({
           const activeBookings = dayBookings.filter(
             (b) => b.status === 'APPROVED' || b.status === 'PENDING'
           );
-          const availability = calculateDayAvailability(dateStr, dayBookings, isPast);
+          const availability = calculateDayAvailability(dateStr, dayBookings, isPast, {
+            includePending: true,
+          });
 
           const hasApproved = dayBookings.some((b) => b.status === 'APPROVED');
           const hasPending = dayBookings.some((b) => b.status === 'PENDING');
@@ -212,7 +214,7 @@ export default function BookingCalendarCard({
                       <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${availability.colorClasses.bar}`}
-                          style={{ width: `${availability.freePercentage}%` }}
+                          style={{ width: `${availability.statusLevel === 'FULL' ? 100 : availability.bookedPercentage}%` }}
                         />
                       </div>
                     )}

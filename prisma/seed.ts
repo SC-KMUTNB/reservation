@@ -4,9 +4,17 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Ensure preferences column exists non-destructively with zero data loss
+  try {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "preferences" JSONB;'
+    );
+  } catch {}
+
   const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || 'ChangeMeImmediately123!';
   const superAdminPassword = await bcrypt.hash(defaultPassword, 10);
   const adminPassword = await bcrypt.hash(defaultPassword, 10);
+
 
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@kmutnb.ac.th' },

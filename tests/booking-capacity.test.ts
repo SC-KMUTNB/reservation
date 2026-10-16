@@ -51,7 +51,7 @@ describe('calculateDayAvailability', () => {
     expect(res.label).toBe('ว่าง 6 ชม.');
   });
 
-  it('should ignore non-approved bookings (PENDING, REJECTED, CANCELLED)', () => {
+  it('should ignore non-approved bookings (PENDING, REJECTED, CANCELLED) when includePending is false', () => {
     const bookings = [
       { startTime: '09:00', endTime: '12:00', status: 'PENDING', date: '2026-11-01' },
       { startTime: '13:00', endTime: '15:00', status: 'REJECTED', date: '2026-11-01' },
@@ -60,9 +60,27 @@ describe('calculateDayAvailability', () => {
     const res = calculateDayAvailability('2026-11-01', bookings, false);
     expect(res.bookedHours).toBe(0);
     expect(res.freeHours).toBe(12);
+    expect(res.bookedPercentage).toBe(0);
+    expect(res.freePercentage).toBe(100);
     expect(res.statusLevel).toBe('FREE');
     expect(res.label).toBe('ว่างทั้งวัน');
   });
+
+  it('should count PENDING bookings when includePending is true (matching live calendar and real db)', () => {
+    const bookings = [
+      { startTime: '09:00', endTime: '12:00', status: 'PENDING', date: '2026-11-01' },
+      { startTime: '13:00', endTime: '15:00', status: 'REJECTED', date: '2026-11-01' },
+      { startTime: '16:00', endTime: '18:00', status: 'CANCELLED', date: '2026-11-01' },
+    ];
+    const res = calculateDayAvailability('2026-11-01', bookings, false, { includePending: true });
+    expect(res.bookedHours).toBe(3);
+    expect(res.freeHours).toBe(9);
+    expect(res.bookedPercentage).toBe(25);
+    expect(res.freePercentage).toBe(75);
+    expect(res.statusLevel).toBe('MODERATE');
+    expect(res.label).toBe('ว่าง 9 ชม.');
+  });
+
 
   it('should ignore bookings on different dates if date is provided', () => {
     const bookings = [

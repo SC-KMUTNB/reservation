@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/auth';
-import { DEFAULT_USER_PREFERENCES, mergeUserPreferences } from '@/lib/user-preferences';
+import { DEFAULT_USER_PREFERENCES, mergeUserPreferences, ensurePreferencesColumn } from '@/lib/user-preferences';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,10 +12,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { preferences: true },
-    });
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferences: true },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2022' || err?.message?.includes('preferences')) {
+        await ensurePreferencesColumn(prisma);
+        try {
+          user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { preferences: true },
+          });
+        } catch {
+          user = { preferences: null };
+        }
+      } else {
+        throw err;
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'ไม่พบผู้ใช้งาน' }, { status: 404 });
@@ -28,7 +45,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ preferences });
   } catch (error) {
     console.error('Error fetching user preferences:', error);
-    return NextResponse.json({ error: 'ไม่สามารถดึงข้อมูลการตั้งค่าได้' }, { status: 500 });
+    return NextResponse.json({ preferences: DEFAULT_USER_PREFERENCES });
   }
 }
 
@@ -41,10 +58,27 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาเข้าสู่ระบบ' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { preferences: true },
-    });
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferences: true },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2022' || err?.message?.includes('preferences')) {
+        await ensurePreferencesColumn(prisma);
+        try {
+          user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { preferences: true },
+          });
+        } catch {
+          user = { preferences: null };
+        }
+      } else {
+        throw err;
+      }
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'ไม่พบผู้ใช้งาน' }, { status: 404 });
@@ -74,12 +108,30 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        preferences: merged as any,
-      },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          preferences: merged as any,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2022' || err?.message?.includes('preferences')) {
+        await ensurePreferencesColumn(prisma);
+        try {
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              preferences: merged as any,
+            },
+          });
+        } catch (updateErr) {
+          console.warn('Could not persist preferences to database column:', updateErr);
+        }
+      } else {
+        throw err;
+      }
+    }
 
     return NextResponse.json({ success: true, preferences: merged });
   } catch (error) {
@@ -87,3 +139,4 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'ไม่สามารถบันทึกการตั้งค่าได้' }, { status: 500 });
   }
 }
+

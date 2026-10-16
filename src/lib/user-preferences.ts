@@ -86,3 +86,99 @@ export function mergeUserPreferences(raw?: any): UserDashboardPreferences {
     visibleColumns,
   };
 }
+
+/**
+ * Ensures the preferences column exists in the PostgreSQL User table.
+ * Non-destructive and idempotent: runs ALTER TABLE ADD COLUMN IF NOT EXISTS.
+ * Causes zero data loss on existing database rows.
+ */
+let columnEnsured = false;
+export async function ensurePreferencesColumn(prismaClient: any): Promise<boolean> {
+  if (columnEnsured) return true;
+  try {
+    if (typeof prismaClient?.$executeRawUnsafe === 'function') {
+      await prismaClient.$executeRawUnsafe(
+        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "preferences" JSONB;'
+      );
+      columnEnsured = true;
+      return true;
+    }
+  } catch {
+    // Ignore error if DDL is restricted or in mock environment
+  }
+  return false;
+}
+
+/**
+ * Safely fetches a user session record with preferences, automatically
+ * handling cases where the database column has not been migrated yet.
+ */
+export async function safeGetUserWithPreferences(prismaClient: any, userId: string) {
+  try {
+    const user = await prismaClient.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+        googleId: true,
+        googleEmail: true,
+        preferences: true,
+      },
+    });
+    return user;
+  } catch (err: any) {
+    if (err?.code === 'P2022' || err?.message?.includes('preferences')) {
+      // Auto-migrate non-destructively
+      const migrated = await ensurePreferencesColumn(prismaClient);
+      if (migrated) {
+        try {
+          return await prismaClient.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              fullName: true,
+              role: true,
+              isActive: true,
+              googleId: true,
+              googleEmail: true,
+              preferences: true,
+            },
+          });
+        } catch {
+          // If still fails, fall through to fallback
+        }
+      }
+
+      // Safe fallback selecting only columns known to exist
+      const fallbackUser = await prismaClient.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          role: true,
+          isActive: true,
+          googleId: true,
+          googleEmail: true,
+        },
+      });
+
+      if (fallbackUser) {
+        return {
+          ...fallbackUser,
+          preferences: null,
+        };
+      }
+      return null;
+    }
+    throw err;
+  }
+}
+

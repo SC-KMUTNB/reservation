@@ -31,6 +31,7 @@ export interface DayAvailability {
   bookedHours: number;
   freeHours: number;
   freePercentage: number; // 0 to 100
+  bookedPercentage: number; // 0 to 100
   statusLevel: 'FREE' | 'MODERATE' | 'LOW' | 'FULL' | 'PAST';
   label: string; // e.g., 'ว่างทั้งวัน', 'ว่าง 9 ชม.', 'เต็มทุกช่วง', 'ประวัติ'
   colorClasses: {
@@ -47,6 +48,10 @@ export interface BookingSlotInput {
   status: string;
   date?: string;
   [key: string]: any;
+}
+
+export interface CalculateDayAvailabilityOptions {
+  includePending?: boolean;
 }
 
 function parseTimeToMinutes(timeStr: string): number {
@@ -71,24 +76,29 @@ function isSlotOverlapping(
 }
 
 /**
- * Calculates availability, free hours, and color badge attributes for a given calendar day.
- * Only APPROVED bookings consume operational hours.
+ * Calculates availability, free hours, capacity usage, and color badge attributes for a calendar day.
+ * Active bookings (APPROVED and PENDING) consume operational slots because both block double-booking.
+ * REJECTED and CANCELLED bookings are ignored.
  */
 export function calculateDayAvailability(
   dateStr: string,
   bookings: BookingSlotInput[],
-  isPast: boolean = false
+  isPast: boolean = false,
+  options?: CalculateDayAvailabilityOptions
 ): DayAvailability {
-  // Filter for approved bookings matching this date (if date property provided)
-  const approvedBookings = (bookings || []).filter((b) => {
-    if (b.status !== 'APPROVED') return false;
+  const includePending = options?.includePending ?? false;
+
+  // Filter for active bookings matching this date
+  const activeBookings = (bookings || []).filter((b) => {
     if (b.date && b.date !== dateStr) return false;
-    return true;
+    if (b.status === 'APPROVED') return true;
+    if (includePending && b.status === 'PENDING') return true;
+    return false;
   });
 
   let bookedSlotsCount = 0;
   for (const slot of OPERATIONAL_SLOTS) {
-    const isBooked = approvedBookings.some((b) =>
+    const isBooked = activeBookings.some((b) =>
       isSlotOverlapping(slot.start, slot.end, b.startTime, b.endTime)
     );
     if (isBooked) {
@@ -100,6 +110,7 @@ export function calculateDayAvailability(
   const bookedHours = bookedSlotsCount;
   const freeHours = Math.max(0, totalHours - bookedHours);
   const freePercentage = Math.round((freeHours / totalHours) * 100);
+  const bookedPercentage = Math.round((bookedHours / totalHours) * 100);
 
   let statusLevel: DayAvailability['statusLevel'];
   let label: string;
@@ -157,8 +168,10 @@ export function calculateDayAvailability(
     bookedHours,
     freeHours,
     freePercentage,
+    bookedPercentage,
     statusLevel,
     label,
     colorClasses,
   };
 }
+

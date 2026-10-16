@@ -211,4 +211,73 @@ describe('User Preferences API Routes', () => {
     expect(data.user.preferences.tableDensity).toBe('compact');
     expect(data.user.preferences.visibleWidgets).toEqual(DEFAULT_USER_PREFERENCES.visibleWidgets);
   });
+
+  it('GET /api/auth/me falls back to DEFAULT_USER_PREFERENCES without 500 when User.preferences column is missing (P2022)', async () => {
+    spyOn(authModule, 'getSessionFromRequest').mockResolvedValue({
+      id: 'mock-user-1',
+      email: 'admin@kmutnb.ac.th',
+      fullName: 'Mock Admin',
+      role: 'ADMIN',
+    });
+
+    (prisma as any).$executeRawUnsafe = async () => {};
+
+    (prisma as any).user = {
+      findUnique: async (args: any) => {
+        // If query attempts to select preferences, simulate P2022 error
+        if (args?.select?.preferences) {
+          const err: any = new Error('The column User.preferences does not exist in the current database.');
+          err.code = 'P2022';
+          err.meta = { modelName: 'User', column: 'User.preferences' };
+          throw err;
+        }
+        // Fallback query without preferences succeeds
+        return {
+          id: 'mock-user-1',
+          email: 'admin@kmutnb.ac.th',
+          username: 'mockadmin',
+          fullName: 'Mock Admin',
+          role: 'ADMIN',
+          isActive: true,
+          googleId: null,
+          googleEmail: null,
+        };
+      },
+    };
+
+    const req = new NextRequest('http://localhost:3000/api/auth/me');
+    const res = await getAuthMe(req);
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.authenticated).toBe(true);
+    expect(data.user.preferences).toEqual(DEFAULT_USER_PREFERENCES);
+  });
+
+  it('GET /api/users/preferences returns DEFAULT_USER_PREFERENCES without 500 when column is missing (P2022)', async () => {
+    spyOn(authModule, 'getSessionFromRequest').mockResolvedValue({
+      id: 'mock-user-1',
+      email: 'admin@kmutnb.ac.th',
+      fullName: 'Mock Admin',
+      role: 'ADMIN',
+    });
+
+    (prisma as any).user = {
+      findUnique: async () => {
+        const err: any = new Error('The column User.preferences does not exist in the current database.');
+        err.code = 'P2022';
+        err.meta = { modelName: 'User', column: 'User.preferences' };
+        throw err;
+      },
+    };
+
+    const req = new NextRequest('http://localhost:3000/api/users/preferences');
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.preferences).toEqual(DEFAULT_USER_PREFERENCES);
+  });
 });
+
+

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DEFAULT_USER_PREFERENCES, mergeUserPreferences } from '@/lib/user-preferences';
+import { DEFAULT_USER_PREFERENCES, mergeUserPreferences, safeGetUserWithPreferences } from '@/lib/user-preferences';
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -9,20 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      fullName: true,
-      role: true,
-      isActive: true,
-      googleId: true,
-      googleEmail: true,
-      preferences: true,
-    },
-  });
+  const user = await safeGetUserWithPreferences(prisma, session.id);
 
   if (!user || !user.isActive) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
