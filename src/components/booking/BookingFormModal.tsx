@@ -56,9 +56,9 @@ export default function BookingFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-slate-100 my-auto text-slate-800 space-y-5">
-        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+      <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl border border-slate-100 my-auto text-slate-800 max-h-[calc(100dvh-1.5rem)] flex flex-col">
+        <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
           <div>
             <h3 className="text-lg font-bold text-slate-900">ส่งคำขอจองห้องประชุมวันที่ {selectedDate}</h3>
             <p className="text-xs text-slate-500 mt-0.5">กรุณาเลือกช่วงเวลา และระบุข้อมูลผู้ขอใช้บริการให้ครบถ้วน</p>
@@ -72,39 +72,41 @@ export default function BookingFormModal({
           </button>
         </div>
 
-        <EquipmentSelector
-          equipmentList={facilityConfig.equipmentList || []}
-          selectedEquipment={formData.borrowedEquipment || []}
-          onToggleEquipment={onToggleEquipment}
-          roomName={facilityConfig.roomName}
-          roomLocation={facilityConfig.roomLocation}
-          maxCapacity={facilityConfig.maxCapacity}
-        />
+        <div className="overflow-y-auto flex-1 pr-1 -mr-1 space-y-5 pt-4">
+          <EquipmentSelector
+            equipmentList={facilityConfig.equipmentList || []}
+            selectedEquipment={formData.borrowedEquipment || []}
+            onToggleEquipment={onToggleEquipment}
+            roomName={facilityConfig.roomName}
+            roomLocation={facilityConfig.roomLocation}
+            maxCapacity={facilityConfig.maxCapacity}
+          />
 
-        <TimeSlotPicker
-          slots={timeSlots}
-          bookingsOnDate={bookingsOnSelectedDate}
-          startTime={formData.startTime}
-          endTime={formData.endTime}
-          onSelectSlot={onSelectSlot}
-          isToday={selectedDate === todayStr}
-          currentTimeStr={nowTimeStr}
-          isPastDate={selectedDate < todayStr}
-        />
+          <TimeSlotPicker
+            slots={timeSlots}
+            bookingsOnDate={bookingsOnSelectedDate}
+            startTime={formData.startTime}
+            endTime={formData.endTime}
+            onSelectSlot={onSelectSlot}
+            isToday={selectedDate === todayStr}
+            currentTimeStr={nowTimeStr}
+            isPastDate={selectedDate < todayStr}
+          />
 
-        <RequesterDetailsForm
-          formData={formData}
-          onChange={onFormFieldChange}
-          errors={validationErrors}
-          rememberMe={rememberMe}
-          onToggleRememberMe={onToggleRememberMe}
-          onClearSavedProfile={onClearSavedProfile}
-          hasSavedProfile={hasSavedProfile}
-          onSubmit={onSubmit}
-          onCancel={onClose}
-          isSubmitting={isLoading}
-          conflictMessage={errorMessage}
-        />
+          <RequesterDetailsForm
+            formData={formData}
+            onChange={onFormFieldChange}
+            errors={validationErrors}
+            rememberMe={rememberMe}
+            onToggleRememberMe={onToggleRememberMe}
+            onClearSavedProfile={onClearSavedProfile}
+            hasSavedProfile={hasSavedProfile}
+            onSubmit={onSubmit}
+            onCancel={onClose}
+            isSubmitting={isLoading}
+            conflictMessage={errorMessage}
+          />
+        </div>
       </div>
     </div>
   );

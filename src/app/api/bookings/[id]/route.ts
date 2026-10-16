@@ -25,7 +25,7 @@ export async function PATCH(
     const ip = getClientIp(request);
 
     // 1. Handle Check-in Action
-    if (body.action === 'CHECK_IN') {
+    if (body.action === 'CHECK_IN' || body.checkIn === true) {
       const currentBooking = await prisma.booking.findUnique({
         where: { id },
       });

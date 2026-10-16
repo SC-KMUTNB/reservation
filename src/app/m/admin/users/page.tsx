@@ -200,137 +200,140 @@ export default function MobileAdminUsersPage() {
         )}
       </div>
 
-      {/* Add User Bottom Sheet */}
+      {/* Add User Modal */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md mx-auto rounded-t-3xl p-5 space-y-3.5 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md mx-auto rounded-3xl p-5 shadow-2xl border border-slate-200 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
               <h3 className="font-bold text-sm text-slate-900">เพิ่มผู้ดูแลระบบใหม่</h3>
-              <button onClick={() => setIsAddOpen(false)} className="text-slate-400 p-1">
+              <button onClick={() => setIsAddOpen(false)} className="text-slate-400 p-1 hover:text-slate-600 rounded-full cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Mode Switcher */}
-            <div className="flex bg-slate-100 p-1 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setCreationMode('invite')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                  creationMode === 'invite'
-                    ? 'bg-white text-orange-600 shadow-2xs'
-                    : 'text-slate-600'
-                }`}
-              >
-                <Send className="w-3 h-3" />
-                <span>ส่งคำเชิญ (แนะนำ)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreationMode('direct')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                  creationMode === 'direct'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-600'
-                }`}
-              >
-                <Key className="w-3 h-3" />
-                <span>กำหนดรหัสผ่านทันที</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  ชื่อ - นามสกุล
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="เช่น นายแอดมิน มจพ."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"
-                />
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1 space-y-3.5 pt-3">
+              {/* Mode Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setCreationMode('invite')}
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    creationMode === 'invite'
+                      ? 'bg-white text-orange-600 shadow-2xs'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  <Send className="w-3 h-3" />
+                  <span>ส่งคำเชิญ (แนะนำ)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreationMode('direct')}
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    creationMode === 'direct'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  <Key className="w-3 h-3" />
+                  <span>กำหนดรหัสผ่านทันที</span>
+                </button>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  อีเมล (@email.kmutnb.ac.th หรือ @kmutnb.ac.th)
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="admin@kmutnb.ac.th"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
-                />
-              </div>
-
-              {creationMode === 'invite' ? (
-                <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3 space-y-1">
-                  <div className="flex items-center gap-1 text-orange-900 font-bold text-[11px]">
-                    <Sparkles className="w-3 h-3 text-orange-600" />
-                    <span>ผู้ใช้จะกำหนดรหัสผ่านด้วยตนเอง</span>
-                  </div>
-                  <p className="text-[10px] text-orange-800/90 leading-relaxed font-light">
-                    ระบบจะส่งอีเมลคำเชิญไปยังผู้ใช้ พร้อมปุ่มลิงก์สร้างรหัสผ่าน (มีอายุ 48 ชั่วโมง)
-                  </p>
-                </div>
-              ) : (
+              <form id="create-user-mobile-form" onSubmit={handleCreateUser} className="space-y-3 text-xs">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    รหัสผ่านเริ่มต้น (อย่างน้อย 6 ตัวอักษร)
+                    ชื่อ - นามสกุล
                   </label>
                   <input
-                    type="password"
-                    required={creationMode === 'direct'}
-                    minLength={6}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
+                    type="text"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    placeholder="เช่น นายแอดมิน มจพ."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    อีเมล (@email.kmutnb.ac.th หรือ @kmutnb.ac.th)
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="admin@kmutnb.ac.th"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  บทบาท (Role)
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium"
-                >
-                  <option value="ADMIN">ADMIN (เจ้าหน้าที่อนุมัติ)</option>
-                  <option value="SUPER_ADMIN">SUPER_ADMIN (สิทธิ์สูงสุด)</option>
-                </select>
-              </div>
+                {creationMode === 'invite' ? (
+                  <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3 space-y-1">
+                    <div className="flex items-center gap-1 text-orange-900 font-bold text-[11px]">
+                      <Sparkles className="w-3 h-3 text-orange-600" />
+                      <span>ผู้ใช้จะกำหนดรหัสผ่านด้วยตนเอง</span>
+                    </div>
+                    <p className="text-[10px] text-orange-800/90 leading-relaxed font-light">
+                      ระบบจะส่งอีเมลคำเชิญไปยังผู้ใช้ พร้อมปุ่มลิงก์สร้างรหัสผ่าน (มีอายุ 48 ชั่วโมง)
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      รหัสผ่านเริ่มต้น (อย่างน้อย 6 ตัวอักษร)
+                    </label>
+                    <input
+                      type="password"
+                      required={creationMode === 'direct'}
+                      minLength={6}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono"
+                    />
+                  </div>
+                )}
 
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-xl text-xs active:scale-98 transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {isSaving ? (
-                    <>
-                      <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>กำลังประมวลผล...</span>
-                    </>
-                  ) : creationMode === 'invite' ? (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>ส่งคำเชิญและสร้างบัญชี</span>
-                    </>
-                  ) : (
-                    <span>สร้างบัญชีผู้ใช้งานทันที</span>
-                  )}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    บทบาท (Role)
+                  </label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium"
+                  >
+                    <option value="ADMIN">ADMIN (เจ้าหน้าที่อนุมัติ)</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN (สิทธิ์สูงสุด)</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <button
+                type="submit"
+                form="create-user-mobile-form"
+                disabled={isSaving}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-xl text-xs active:scale-98 transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>กำลังประมวลผล...</span>
+                  </>
+                ) : creationMode === 'invite' ? (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>ส่งคำเชิญและสร้างบัญชี</span>
+                  </>
+                ) : (
+                  <span>สร้างบัญชีผู้ใช้งานทันที</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -398,9 +398,9 @@ export default function AdminUsersPage() {
 
       {/* Add User Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">เพิ่มผู้ดูแลระบบใหม่</h3>
                 <p className="text-xs text-slate-500 mt-0.5">กรอกข้อมูลบัญชีเพื่อเปิดสิทธิ์การเข้าใช้งาน</p>
@@ -413,128 +413,131 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
-            {/* Creation Mode Switcher */}
-            <div className="flex bg-slate-100 p-1 rounded-2xl mb-4">
-              <button
-                type="button"
-                onClick={() => setCreationMode('invite')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  creationMode === 'invite'
-                    ? 'bg-white text-orange-600 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>ส่งคำเชิญทางอีเมล (แนะนำ)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreationMode('direct')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  creationMode === 'direct'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>กำหนดรหัสผ่านทันที</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddUser} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="เช่น นายกฤตภาส เจริญสุข"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
-                />
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1">
+              {/* Creation Mode Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl mb-4">
+                <button
+                  type="button"
+                  onClick={() => setCreationMode('invite')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    creationMode === 'invite'
+                      ? 'bg-white text-orange-600 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>ส่งคำเชิญทางอีเมล (แนะนำ)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreationMode('direct')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    creationMode === 'direct'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span>กำหนดรหัสผ่านทันที</span>
+                </button>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">อีเมลผู้ใช้งาน</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="admin@kmutnb.ac.th"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
-                />
-              </div>
-
-              {creationMode === 'invite' ? (
-                <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-orange-900 font-bold text-xs">
-                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-                    <span>ผู้ใช้จะกำหนดรหัสผ่านด้วยตนเอง</span>
-                  </div>
-                  <p className="text-[11px] text-orange-800/90 leading-relaxed font-light">
-                    ระบบจะจัดส่งอีเมลคำเชิญไปยัง <span className="font-mono font-medium">{formData.email || 'อีเมลที่ระบุ'}</span> พร้อมปุ่มลิงก์ให้ผู้ใช้เข้ามาตั้งรหัสผ่านและชื่อผู้ใช้ด้วยตนเอง (ลิงก์มีอายุ 48 ชั่วโมง)
-                  </p>
-                </div>
-              ) : (
+              <form id="add-user-form" onSubmit={handleAddUser} className="space-y-4 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
                   <input
-                    type="password"
-                    required={creationMode === 'direct'}
-                    minLength={6}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
+                    type="text"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    placeholder="เช่น นายกฤตภาส เจริญสุข"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">อีเมลผู้ใช้งาน</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="admin@kmutnb.ac.th"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
-                >
-                  <option value="ADMIN">Admin (เจ้าหน้าที่ - ตรวจสอบและอนุมัติการจอง)</option>
-                  <option value="SUPER_ADMIN">Super Admin (สิทธิ์สูงสุด - จัดการผู้ใช้และตั้งค่า)</option>
-                </select>
-              </div>
+                {creationMode === 'invite' ? (
+                  <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-3.5 space-y-1">
+                    <div className="flex items-center gap-1.5 text-orange-900 font-bold text-xs">
+                      <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                      <span>ผู้ใช้จะกำหนดรหัสผ่านด้วยตนเอง</span>
+                    </div>
+                    <p className="text-[11px] text-orange-800/90 leading-relaxed font-light">
+                      ระบบจะจัดส่งอีเมลคำเชิญไปยัง <span className="font-mono font-medium">{formData.email || 'อีเมลที่ระบุ'}</span> พร้อมปุ่มลิงก์ให้ผู้ใช้เข้ามาตั้งรหัสผ่านและชื่อผู้ใช้ด้วยตนเอง (ลิงก์มีอายุ 48 ชั่วโมง)
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+                    <input
+                      type="password"
+                      required={creationMode === 'direct'}
+                      minLength={6}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
+                    />
+                  </div>
+                )}
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  {creationMode === 'invite' ? (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>ส่งคำเชิญและสร้างบัญชี</span>
-                    </>
-                  ) : (
-                    <span>สร้างบัญชีผู้ใช้ทันที</span>
-                  )}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">ระดับสิทธิ์ (Role)</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-medium"
+                  >
+                    <option value="ADMIN">Admin (เจ้าหน้าที่ - ตรวจสอบและอนุมัติการจอง)</option>
+                    <option value="SUPER_ADMIN">Super Admin (สิทธิ์สูงสุด - จัดการผู้ใช้และตั้งค่า)</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                form="add-user-form"
+                className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5"
+              >
+                {creationMode === 'invite' ? (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>ส่งคำเชิญและสร้างบัญชี</span>
+                  </>
+                ) : (
+                  <span>สร้างบัญชีผู้ใช้ทันที</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Edit User Modal */}
       {isEditModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">แก้ไขข้อมูลผู้ดูแลระบบ</h3>
                 <p className="text-xs text-slate-500 mt-0.5">{selectedUser.email}</p>
@@ -547,7 +550,7 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleEditUser} className="space-y-4 text-xs">
+            <form id="edit-user-form" onSubmit={handleEditUser} className="space-y-4 text-xs overflow-y-auto flex-1 pr-1 -mr-1">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล</label>
                 <input
@@ -595,23 +598,24 @@ export default function AdminUsersPage() {
                   <option value="INACTIVE">ระงับการใช้งาน (ห้ามเข้าสู่ระบบ)</option>
                 </select>
               </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer"
-                >
-                  บันทึกการแก้ไข
-                </button>
-              </div>
             </form>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                form="edit-user-form"
+                className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition active-press shadow-warm-xs cursor-pointer"
+              >
+                บันทึกการแก้ไข
+              </button>
+            </div>
           </div>
         </div>
       )}

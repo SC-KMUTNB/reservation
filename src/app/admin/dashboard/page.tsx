@@ -24,11 +24,15 @@ import {
   Eye,
   Building,
   User as UserIcon,
+  Camera,
 } from 'lucide-react';
 import { formatDisplayDate, getSearchableDateVariants, getNowInTimezone } from '@/lib/date-utils';
 import AdminScheduleTimeline, { getWeekDates, toDateString } from '@/components/admin/AdminScheduleTimeline';
 import AdminMonthCalendar from '@/components/admin/AdminMonthCalendar';
 import DashboardCustomizerModal from '@/components/admin/DashboardCustomizerModal';
+import QrScannerModal from '@/components/admin/QrScannerModal';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   UserDashboardPreferences,
   DEFAULT_USER_PREFERENCES,
@@ -107,6 +111,7 @@ export default function AdminDashboardPage() {
   const [checkInModalBooking, setCheckInModalBooking] = useState<AdminBooking | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isRetryingSyncId, setIsRetryingSyncId] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -133,6 +138,31 @@ export default function AdminDashboardPage() {
     fetchPreferences();
     fetchBookings();
   }, []);
+
+  // Support direct QR link: /admin/dashboard?checkIn=BK-XXXX
+  useEffect(() => {
+    if (typeof window !== 'undefined' && bookings.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const checkInCode = params.get('checkIn');
+      if (checkInCode) {
+        const found = bookings.find((b) => b.bookingCode.toUpperCase() === checkInCode.toUpperCase());
+        if (found) {
+          setCheckInModalBooking(found);
+        }
+      }
+    }
+  }, [bookings]);
+
+  const handleScanBookingCode = (code: string) => {
+    setIsScannerOpen(false);
+    const found = bookings.find((b) => b.bookingCode.toUpperCase() === code.toUpperCase());
+    if (found) {
+      setCheckInModalBooking(found);
+    } else {
+      setActionError(`ไม่พบรายการจองที่มีรหัส: ${code}`);
+      setTimeout(() => setActionError(null), 4500);
+    }
+  };
 
   const fetchPreferences = async () => {
     try {
@@ -397,7 +427,7 @@ export default function AdminDashboardPage() {
       const res = await fetch(`/api/bookings/${booking.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkIn: true }),
+        body: JSON.stringify({ action: 'CHECK_IN', checkIn: true }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -838,21 +868,22 @@ export default function AdminDashboardPage() {
 
                         <td className={cellPadding}>
                           <div>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs ${
+                            <Badge
+                              status={
                                 b.status === 'APPROVED'
-                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                                  ? 'APPROVED'
                                   : b.status === 'PENDING'
-                                  ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                                  : 'bg-rose-50 text-rose-800 border border-rose-300'
-                              }`}
+                                  ? 'PENDING'
+                                  : 'REJECTED'
+                              }
+                              className="text-[10px] font-bold shadow-2xs"
                             >
                               {b.status === 'APPROVED'
                                 ? 'อนุมัติแล้ว'
                                 : b.status === 'PENDING'
                                 ? 'รออนุมัติ'
                                 : 'ถูกปฏิเสธ'}
-                            </span>
+                            </Badge>
                           </div>
                           {b.status === 'APPROVED' && (
                             <div className="mt-1">
@@ -1005,9 +1036,9 @@ export default function AdminDashboardPage() {
 
       {/* Single Approve Modal with Conflict Detection */}
       {approvingBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">ยืนยันการอนุมัติคำขอ</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1023,61 +1054,65 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            {conflictsForApproving.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs">
-                <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>พบคำขอรออนุมัติอื่นที่เวลาซ้อนทับกัน ({conflictsForApproving.length} รายการ):</span>
-                </div>
-                <div className="divide-y divide-amber-200/60 max-h-36 overflow-y-auto">
-                  {conflictsForApproving.map((c) => (
-                    <div key={c.id} className="py-1.5 flex justify-between items-center text-amber-950">
-                      <div>
-                        <span className="font-mono font-bold">{c.bookingCode}</span> • {c.fullName} ({c.department})
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1 space-y-4 pt-3">
+              {conflictsForApproving.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2 text-xs">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>พบคำขอรออนุมัติอื่นที่เวลาซ้อนทับกัน ({conflictsForApproving.length} รายการ):</span>
+                  </div>
+                  <div className="divide-y divide-amber-200/60 max-h-36 overflow-y-auto">
+                    {conflictsForApproving.map((c) => (
+                      <div key={c.id} className="py-1.5 flex justify-between items-center text-amber-950">
+                        <div>
+                          <span className="font-mono font-bold">{c.bookingCode}</span> • {c.fullName} ({c.department})
+                        </div>
+                        <div className="font-mono text-[11px] text-amber-800">
+                          {c.startTime} - {c.endTime} น.
+                        </div>
                       </div>
-                      <div className="font-mono text-[11px] text-amber-800">
-                        {c.startTime} - {c.endTime} น.
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <label className="flex items-start gap-2 pt-2 border-t border-amber-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoRejectConflicts}
+                      onChange={(e) => setAutoRejectConflicts(e.target.checked)}
+                      className="mt-0.5 rounded border-amber-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="font-semibold text-amber-900 text-xs">
+                      ปฏิเสธคำขอที่รออนุมัติอื่นซึ่งเวลาชนกันโดยอัตโนมัติ (แนะนำ)
+                    </span>
+                  </label>
                 </div>
-                <label className="flex items-start gap-2 pt-2 border-t border-amber-200 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={autoRejectConflicts}
-                    onChange={(e) => setAutoRejectConflicts(e.target.checked)}
-                    className="mt-0.5 rounded border-amber-300 text-orange-600 focus:ring-orange-500"
-                  />
-                  <span className="font-semibold text-amber-900 text-xs">
-                    ปฏิเสธคำขอที่รออนุมัติอื่นซึ่งเวลาชนกันโดยอัตโนมัติ (แนะนำ)
-                  </span>
-                </label>
-              </div>
-            )}
+              )}
 
-            <p className="text-xs text-slate-600">
-              เมื่ออนุมัติ ระบบจะส่งอีเมลแจ้งผู้จอง พร้อมแนบไฟล์ปฏิทิน (.ics) และบันทึกลง Google Sheets
-            </p>
+              <p className="text-xs text-slate-600">
+                เมื่ออนุมัติ ระบบจะส่งอีเมลแจ้งผู้จอง พร้อมแนบไฟล์ปฏิทิน (.ics) และบันทึกลง Google Sheets
+              </p>
+            </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setApprovingBooking(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+                className="text-xs"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="success"
                 onClick={() => {
                   const b = approvingBooking;
                   setApprovingBooking(null);
                   updateBookingStatus(b.id, 'APPROVED', undefined, autoRejectConflicts);
                 }}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5"
+                className="text-xs"
               >
                 <Check className="w-4 h-4" /> ยืนยันการอนุมัติ
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1085,9 +1120,9 @@ export default function AdminDashboardPage() {
 
       {/* Quick Rejection Reason Modal */}
       {rejectingBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
-            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
                   ระบุเหตุผลในการปฏิเสธคำขอ
@@ -1105,7 +1140,7 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="space-y-3 mb-5">
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1 -mr-1">
               <label className="block text-xs font-semibold text-slate-700">
                 เลือกเหตุผลสำเร็จรูป หรือพิมพ์ระบุเอง:
               </label>
@@ -1131,21 +1166,23 @@ export default function AdminDashboardPage() {
               ></textarea>
             </div>
 
-            <div className="flex justify-end gap-2.5">
-              <button
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setRejectingBooking(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+                className="text-xs"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={() => updateBookingStatus(rejectingBooking.id, 'REJECTED', rejectionReasonInput)}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer"
+                className="text-xs"
               >
                 ยืนยันการปฏิเสธ
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1153,9 +1190,9 @@ export default function AdminDashboardPage() {
 
       {/* QR Check-In Modal */}
       {checkInModalBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-orange-100 text-orange-600">
                   <QrCode className="w-5 h-5" />
@@ -1174,64 +1211,68 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-xs border border-slate-200">
-              <div className="flex justify-between">
-                <span className="text-slate-500">ผู้ขอใช้บริการ:</span>
-                <span className="font-semibold text-slate-900">{checkInModalBooking.fullName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">รหัสนักศึกษา:</span>
-                <span className="font-mono text-slate-900">{checkInModalBooking.studentId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">หน่วยงาน / ชมรม:</span>
-                <span className="text-slate-900">{checkInModalBooking.department}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">วันที่จอง:</span>
-                <span className="font-bold text-slate-900">{formatDisplayDate(checkInModalBooking.date)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">เวลา:</span>
-                <span className="font-mono font-bold text-orange-600">
-                  {checkInModalBooking.startTime} - {checkInModalBooking.endTime} น.
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">วัตถุประสงค์:</span>
-                <span className="text-slate-800 line-clamp-2 max-w-xs text-right">
-                  {checkInModalBooking.reason}
-                </span>
-              </div>
-              {checkInModalBooking.checkedInAt && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-800 text-xs flex items-center gap-2 mt-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    เช็กอินแล้วเมื่อ {new Date(checkInModalBooking.checkedInAt).toLocaleString('th-TH')} โดย{' '}
-                    {checkInModalBooking.checkedInByName || 'เจ้าหน้าที่'}
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1 pt-3">
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-xs border border-slate-200">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ผู้ขอใช้บริการ:</span>
+                  <span className="font-semibold text-slate-900">{checkInModalBooking.fullName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">รหัสนักศึกษา:</span>
+                  <span className="font-mono text-slate-900">{checkInModalBooking.studentId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">หน่วยงาน / ชมรม:</span>
+                  <span className="text-slate-900">{checkInModalBooking.department}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">วันที่จอง:</span>
+                  <span className="font-bold text-slate-900">{formatDisplayDate(checkInModalBooking.date)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">เวลา:</span>
+                  <span className="font-mono font-bold text-orange-600">
+                    {checkInModalBooking.startTime} - {checkInModalBooking.endTime} น.
                   </span>
                 </div>
-              )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">วัตถุประสงค์:</span>
+                  <span className="text-slate-800 line-clamp-2 max-w-xs text-right">
+                    {checkInModalBooking.reason}
+                  </span>
+                </div>
+                {checkInModalBooking.checkedInAt && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-emerald-800 text-xs flex items-center gap-2 mt-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      เช็กอินแล้วเมื่อ {new Date(checkInModalBooking.checkedInAt).toLocaleString('th-TH')} โดย{' '}
+                      {checkInModalBooking.checkedInByName || 'เจ้าหน้าที่'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setCheckInModalBooking(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+                className="text-xs"
               >
                 ปิด
-              </button>
+              </Button>
               {checkInModalBooking.status === 'APPROVED' && !checkInModalBooking.checkedInAt && (
-                <button
+                <Button
                   type="button"
+                  variant="primary"
                   disabled={isCheckingIn}
                   onClick={() => handleCheckIn(checkInModalBooking)}
-                  className="px-5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  className="text-xs"
                 >
                   <Check className="w-4 h-4" />
                   {isCheckingIn ? 'กำลังเช็กอิน...' : 'ยืนยันการเช็กอินเข้าใช้งานห้องประชุม'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -1240,9 +1281,9 @@ export default function AdminDashboardPage() {
 
       {/* Batch Approve Modal */}
       {isBatchApproveModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-100 text-emerald-600">
                   <Check className="w-5 h-5" />
@@ -1263,27 +1304,31 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              ระบบจะตรวจสอบช่วงเวลาว่ามีคำขอใดซ้อนทับกันหรือไม่ หากไม่มีความขัดแย้ง ระบบจะอนุมัติพร้อมกัน ส่งอีเมลแจ้งเตือนผู้จองทุกคน และบันทึกประวัติการทำงานอัตโนมัติ
-            </p>
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1 pt-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                ระบบจะตรวจสอบช่วงเวลาว่ามีคำขอใดซ้อนทับกันหรือไม่ หากไม่มีความขัดแย้ง ระบบจะอนุมัติพร้อมกัน ส่งอีเมลแจ้งเตือนผู้จองทุกคน และบันทึกประวัติการทำงานอัตโนมัติ
+              </p>
+            </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setIsBatchApproveModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+                className="text-xs"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="success"
                 disabled={isBatchProcessing}
                 onClick={handleBatchApprove}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="text-xs"
               >
                 <Check className="w-4 h-4" />
                 {isBatchProcessing ? 'กำลังประมวลผล...' : 'ยืนยันอนุมัติที่เลือก'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1291,9 +1336,9 @@ export default function AdminDashboardPage() {
 
       {/* Batch Reject Modal */}
       {isBatchRejectModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-rose-100 text-rose-600">
                   <X className="w-5 h-5" />
@@ -1314,7 +1359,7 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1 -mr-1 pt-3">
               <label className="block text-xs font-semibold text-slate-700">
                 เลือกเหตุผลสำเร็จรูป หรือพิมพ์ระบุเหตุผลส่วนกลาง:
               </label>
@@ -1340,23 +1385,25 @@ export default function AdminDashboardPage() {
               ></textarea>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setIsBatchRejectModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-200 transition cursor-pointer"
+                className="text-xs"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
                 disabled={isBatchProcessing}
                 onClick={handleBatchReject}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition active-press shadow-warm-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="text-xs"
               >
                 <X className="w-4 h-4" />
                 {isBatchProcessing ? 'กำลังปฏิเสธ...' : 'ยืนยันปฏิเสธที่เลือก'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1364,9 +1411,9 @@ export default function AdminDashboardPage() {
 
       {/* Conflict Results Modal */}
       {conflictResults && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-100 text-amber-600">
                   <AlertTriangle className="w-5 h-5" />
@@ -1385,7 +1432,7 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1 -mr-1 pt-3">
               <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-semibold">
                 ✓ อนุมัติสำเร็จ: {conflictResults.approvedCount} รายการ
               </div>
@@ -1405,7 +1452,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-3 border-t border-slate-100 shrink-0 mt-2">
               <button
                 type="button"
                 onClick={() => setConflictResults(null)}
@@ -1420,9 +1467,9 @@ export default function AdminDashboardPage() {
 
       {/* Booking Details Modal */}
       {detailsBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="flex justify-between items-start pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">รายละเอียดคำขอจองห้อง</h3>
                 <p className="text-xs font-mono text-orange-600 mt-0.5">{detailsBooking.bookingCode}</p>
@@ -1436,7 +1483,7 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5 text-xs overflow-y-auto flex-1 pr-1 -mr-1 pt-3">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">ผู้ขอจอง:</span>
                 <span className="font-semibold text-slate-800">{detailsBooking.fullName}</span>
@@ -1485,7 +1532,7 @@ export default function AdminDashboardPage() {
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 shrink-0 mt-2">
               <button
                 type="button"
                 onClick={() => setDetailsBooking(null)}
@@ -1531,6 +1578,27 @@ export default function AdminDashboardPage() {
         onClose={() => setIsCustomizerOpen(false)}
         preferences={preferences}
         onSave={handleSavePreferences}
+      />
+
+      {/* Floating Action Button for Mobile QR Check-In */}
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setIsScannerOpen(true)}
+          className="p-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl shadow-xl shadow-orange-600/35 border-2 border-white/80 active:scale-95 transition-all flex items-center gap-2 cursor-pointer group"
+          title="สแกน QR Code เช็กอิน"
+          aria-label="สแกน QR Code เช็กอิน"
+        >
+          <Camera className="w-5 h-5 group-hover:rotate-6 transition-transform stroke-[2.2]" />
+          <span className="text-xs font-bold pr-1">สแกนเช็กอิน</span>
+        </button>
+      </div>
+
+      {/* QR Camera Scanner Modal */}
+      <QrScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScanSuccess={handleScanBookingCode}
       />
     </div>
   );

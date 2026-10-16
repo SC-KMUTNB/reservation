@@ -29,6 +29,8 @@ import {
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 import { isBackdated } from '@/lib/date-utils';
 import { buildGoogleCalendarUrl, generateIcsContent } from '@/lib/calendar-export';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export interface BookingTrackItem {
   id: string;
@@ -280,13 +282,13 @@ function TrackContent() {
                 </button>
               )}
             </div>
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-5 md:px-6 py-2.5 rounded-2xl font-semibold text-xs md:text-sm transition shadow-warm-xs active-press cursor-pointer disabled:opacity-50 shrink-0"
+              className="rounded-2xl px-5 md:px-6 py-2.5 text-xs md:text-sm shrink-0"
             >
               {isLoading ? 'กำลังค้นหา...' : 'ค้นหาข้อมูล'}
-            </button>
+            </Button>
           </form>
         </div>
 
@@ -370,24 +372,24 @@ function TrackContent() {
 
                       <div className="flex flex-wrap items-center gap-2">
                         {isApproved && (
-                          <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold px-3 py-1.5 rounded-full shadow-2xs">
+                          <Badge status="APPROVED" className="text-xs font-bold px-3 py-1.5 shadow-2xs">
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" /> อนุมัติแล้ว (ยืนยัน)
-                          </span>
+                          </Badge>
                         )}
                         {isPending && (
-                          <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold px-3 py-1.5 rounded-full shadow-2xs">
+                          <Badge status="PENDING" className="text-xs font-bold px-3 py-1.5 shadow-2xs">
                             <AlertCircle className="w-4 h-4 text-amber-600" /> รอตรวจสอบ (Pending)
-                          </span>
+                          </Badge>
                         )}
                         {isRejected && (
-                          <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-800 border border-rose-300 text-xs font-bold px-3 py-1.5 rounded-full shadow-2xs">
+                          <Badge status="REJECTED" className="text-xs font-bold px-3 py-1.5 shadow-2xs">
                             <XCircle className="w-4 h-4 text-rose-600" /> ปฏิเสธคำขอ
-                          </span>
+                          </Badge>
                         )}
                         {isCancelled && (
-                          <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold px-3 py-1.5 rounded-full shadow-2xs">
+                          <Badge status="CANCELLED" className="text-xs font-bold px-3 py-1.5 shadow-2xs">
                             <X className="w-4 h-4 text-slate-500" /> ยกเลิกแล้ว (Cancelled)
-                          </span>
+                          </Badge>
                         )}
 
                         {canCancel && (
@@ -548,85 +550,90 @@ function TrackContent() {
 
       {/* Cancellation Confirmation Modal (Task 2.1) */}
       {cancellingBooking && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-slate-800">
-            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-warm-xs">
-              <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-slate-800 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+            <div className="overflow-y-auto flex-1 pr-1 -mr-1">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-warm-xs">
+                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 text-center mb-1">
+                ยืนยันการยกเลิกการจองห้อง
+              </h3>
+              <p className="text-xs text-slate-500 text-center mb-4">
+                รหัสการจอง: <span className="font-mono font-bold text-orange-600">{cancellingBooking.bookingCode}</span>
+              </p>
+
+              {cancelError && (
+                <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-700 text-xs p-3 rounded-xl flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
+              <form id="cancel-booking-form" onSubmit={handleConfirmCancel} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    รหัสนักศึกษา 13 หลัก
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={cancelStudentId}
+                    onChange={(e) => setCancelStudentId(e.target.value)}
+                    placeholder="เช่น 6501012345678"
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    เบอร์โทรศัพท์ 4 ตัวท้ายของผู้จอง
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={4}
+                    value={cancelPhoneLast4}
+                    onChange={(e) => setCancelPhoneLast4(e.target.value)}
+                    placeholder="เช่น 5678"
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    เหตุผลในการยกเลิก (ไม่บังคับ)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="ระบุเหตุผลที่ขอยกเลิก เช่น ติดภารกิจด่วน, เลื่อนการประชุม"
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                  ></textarea>
+                </div>
+              </form>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 text-center mb-1">
-              ยืนยันการยกเลิกการจองห้อง
-            </h3>
-            <p className="text-xs text-slate-500 text-center mb-4">
-              รหัสการจอง: <span className="font-mono font-bold text-orange-600">{cancellingBooking.bookingCode}</span>
-            </p>
 
-            {cancelError && (
-              <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-700 text-xs p-3 rounded-xl flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{cancelError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleConfirmCancel} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  รหัสนักศึกษา 13 หลัก
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={cancelStudentId}
-                  onChange={(e) => setCancelStudentId(e.target.value)}
-                  placeholder="เช่น 6501012345678"
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  เบอร์โทรศัพท์ 4 ตัวท้ายของผู้จอง
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={4}
-                  value={cancelPhoneLast4}
-                  onChange={(e) => setCancelPhoneLast4(e.target.value)}
-                  placeholder="เช่น 5678"
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  เหตุผลในการยกเลิก (ไม่บังคับ)
-                </label>
-                <textarea
-                  rows={2}
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="ระบุเหตุผลที่ขอยกเลิก เช่น ติดภารกิจด่วน, เลื่อนการประชุม"
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-rose-500"
-                ></textarea>
-              </div>
-
-              <div className="flex gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setCancellingBooking(null)}
-                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-semibold text-xs transition cursor-pointer"
-                >
-                  ย้อนกลับ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCancelling}
-                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition shadow-warm-xs disabled:opacity-50 cursor-pointer"
-                >
-                  {isCancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิกการจอง'}
-                </button>
-              </div>
-            </form>
+            <div className="flex gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setCancellingBooking(null)}
+                className="flex-1 text-xs"
+              >
+                ย้อนกลับ
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                form="cancel-booking-form"
+                disabled={isCancelling}
+                className="flex-1 text-xs"
+              >
+                {isCancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิกการจอง'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

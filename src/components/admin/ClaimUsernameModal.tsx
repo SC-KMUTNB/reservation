@@ -120,19 +120,21 @@ export default function ClaimUsernameModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
         {/* Glow effect background */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Close / Dismiss button */}
         <button
           onClick={handleDismiss}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer z-10"
           title="ไว้คราวหลัง"
         >
           <X className="w-5 h-5" />
         </button>
+
+        <div className="overflow-y-auto flex-1 pr-1 -mr-1 relative">
 
         {/* Icon & Title */}
         <div className="flex items-center gap-3 mb-4">
@@ -162,7 +164,7 @@ export default function ClaimUsernameModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="claim-username-form" onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               ชื่อผู้ใช้ที่ต้องการ (Username)
@@ -214,36 +216,38 @@ export default function ClaimUsernameModal({
               * 3-20 ตัวอักษร (a-z, 0-9, จุด ., ขีดล่าง _, ขีดกลาง -)
             </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="flex-1 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
-            >
-              ไว้คราวหลัง
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || isAvailable === false || !username.trim()}
-              className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold transition shadow-lg shadow-orange-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>กำลังบันทึก...</span>
-                </>
-              ) : (
-                <>
-                  <span>ยืนยันชื่อผู้ใช้</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          </div>
         </form>
       </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2.5 pt-3 border-t border-slate-800 shrink-0 mt-2">
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="flex-1 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+        >
+          ไว้คราวหลัง
+        </button>
+        <button
+          type="submit"
+          form="claim-username-form"
+          disabled={isSubmitting || isAvailable === false || !username.trim()}
+          className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold transition shadow-lg shadow-orange-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>กำลังบันทึก...</span>
+            </>
+          ) : (
+            <>
+              <span>ยืนยันชื่อผู้ใช้</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </>
+          )}
+        </button>
+      </div>
     </div>
+  </div>
   );
 }
