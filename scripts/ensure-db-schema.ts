@@ -10,6 +10,28 @@ async function main() {
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "preferences" JSONB;'
     );
     console.log('✅ Column "User.preferences" verified/created successfully with zero data loss.');
+
+    // Populate default preferences for any existing accounts with NULL preferences
+    const defaultJson = JSON.stringify({
+      defaultView: 'TABLE',
+      defaultStatusFilter: 'ALL',
+      tableDensity: 'normal',
+      density: 'normal',
+      visibleWidgets: ['PENDING', 'TODAY', 'URGENT', 'WEEKLY'],
+      visibleColumns: {
+        department: true,
+        studentId: true,
+        reason: true,
+        approvedBy: true,
+      },
+    });
+
+    const updatedCount = await prisma.$executeRawUnsafe(
+      `UPDATE "User" SET "preferences" = $1::jsonb WHERE "preferences" IS NULL;`,
+      defaultJson
+    );
+    console.log(`✅ Populated default preferences for ${updatedCount} admin accounts in database.`);
+
   } catch (err: any) {
     console.error('Failed to run migration:', err?.message || err);
     process.exit(1);
