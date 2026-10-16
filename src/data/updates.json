@@ -1,5 +1,34 @@
 [
   {
+    "version": "v1.9.0",
+    "date": "2026-10-17",
+    "type": "minor",
+    "title": "ระบบซิงก์ประวัติการอัปเดตจาก GitHub Releases และระบบจัดหมวดหมู่เวอร์ชันตามมาตรฐาน SemVer (Dynamic GitHub Changelog & SemVer Suite)",
+    "summary": "เปลี่ยนผ่านระบบประวัติการอัปเดตจากการฝังไฟล์ข้อมูลขนาดใหญ่ มาเป็นการดึงข้อมูลแบบไดนามิกจาก GitHub Releases ผ่าน Next.js API พร้อมระบบแคช ISR, รองรับการจำแนกเวอร์ชันตามมาตรฐานสากล SemVer 3 ระดับ (Major/Minor/Patch), เครื่องมือคำสั่งซิงก์ผ่าน GitHub CLI (gh) และปุ่มรีเฟรชข้อมูลสำหรับผู้ดูแลระบบ",
+    "changes": [
+      {
+        "category": "feat",
+        "description": "ระบบดึงและแคชประวัติการอัปเดตจาก GitHub Releases (Dynamic GitHub Releases Integration) ผ่าน Next.js Server Route พร้อมระบบแคช ISR 1 ชม. และระบบสำรองข้อมูลออฟไลน์ (Offline Fallback)"
+      },
+      {
+        "category": "feat",
+        "description": "ระบบจำแนกและกรองเวอร์ชันตามมาตรฐาน SemVer 3 ระดับ (Major, Minor, Patch) อัตโนมัติตามรูปแบบ Tag พร้อมการ์ดสถิติแยกประเภทในหน้า Changelog"
+      },
+      {
+        "category": "feat",
+        "description": "ปุ่มรีเฟรชข้อมูลล่าสุด (Force Refresh) พร้อมสถานะการซิงก์และลิงก์เปิดดูบันทึกการปล่อยเวอร์ชันบน GitHub โดยตรง"
+      },
+      {
+        "category": "feat",
+        "description": "สคริปต์ซิงก์ข้อมูลเวอร์ชันสู่ GitHub Releases (sync-releases-to-github) รองรับทั้ง GitHub CLI (gh) แบบตรวจจับการล็อกอินอัตโนมัติ และ REST API"
+      },
+      {
+        "category": "improve",
+        "description": "ลดขนาด Client Bundle ของหน้าเว็บแอดมิน โดยตัดการฝังไฟล์ข้อมูล updates.json ทั้งหมดออกจากเบราว์เซอร์ เพื่อป้องกันการขยายตัวของไฟล์อย่างไม่สิ้นสุด"
+      }
+    ]
+  },
+  {
     "version": "v1.8.0",
     "date": "2026-10-16",
     "type": "minor",
