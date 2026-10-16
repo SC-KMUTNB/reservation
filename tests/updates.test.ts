@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import updatesData from '@/data/updates.json';
 
 describe('updates.json validation', () => {
-  test('updates.json is valid and contains v1.6.0 as latest', () => {
+  test('updates.json is valid and contains latest updates', () => {
     expect(Array.isArray(updatesData)).toBe(true);
     expect(updatesData.length).toBeGreaterThan(0);
 

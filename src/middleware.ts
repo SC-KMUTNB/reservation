@@ -1,6 +1,24 @@
 import { NextResponse, type NextRequest, userAgent } from 'next/server';
+import { jwtVerify } from 'jose';
 
-export function middleware(request: NextRequest) {
+const JWT_SECRET_STRING =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === 'test'
+    ? 'test-fallback-secret-key-kmutnb-reservation-32chars!'
+    : '');
+const SECRET_KEY = new TextEncoder().encode(JWT_SECRET_STRING);
+
+async function verifyAdminToken(token?: string | null): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const { payload } = await jwtVerify(token, SECRET_KEY);
+    return !!payload;
+  } catch {
+    return false;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   // Skip API routes, static assets, images, etc.
@@ -11,6 +29,41 @@ export function middleware(request: NextRequest) {
     pathname.includes('.')
   ) {
     return NextResponse.next();
+  }
+
+  // --- Admin Route Protection ---
+  const isAdminPath = pathname.startsWith('/admin') || pathname.startsWith('/m/admin');
+  if (isAdminPath) {
+    const isMobileAdmin = pathname.startsWith('/m/admin');
+    const loginPath = isMobileAdmin ? '/m/admin/login' : '/admin/login';
+    const dashboardPath = isMobileAdmin ? '/m/admin/dashboard' : '/admin/dashboard';
+    const isLoginPage = pathname === '/admin/login' || pathname === '/m/admin/login';
+    const isSetupPage =
+      pathname === '/admin/setup-password' || pathname === '/m/admin/setup-password';
+
+    const token = request.cookies.get('admin_token')?.value;
+    const isAuthenticated = await verifyAdminToken(token);
+
+    if (isLoginPage) {
+      if (isAuthenticated) {
+        return NextResponse.redirect(new URL(dashboardPath, request.url));
+      }
+      // Allow unauthenticated access to login page
+    } else if (isSetupPage) {
+      // Allow unauthenticated access to setup password
+    } else {
+      // Protected admin route
+      if (!isAuthenticated) {
+        const fullPath = pathname + request.nextUrl.search;
+        const redirectUrl = new URL(
+          `${loginPath}?callbackUrl=${encodeURIComponent(fullPath)}`,
+          request.url
+        );
+        const res = NextResponse.redirect(redirectUrl);
+        res.cookies.delete('admin_token');
+        return res;
+      }
+    }
   }
 
   // Handle explicit view preference override from query parameter ?view=desktop or ?view=mobile

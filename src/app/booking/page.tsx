@@ -1,281 +1,162 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Link from 'next/link';
-import {
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Landmark,
-  Lock,
-  Search,
-  AlertTriangle,
-  CheckCircle2,
-  X,
-  Share2,
-  Info,
-  CalendarCheck,
-  CalendarX,
-  ArrowLeft,
-  Copy,
-  Check,
-  RotateCw,
-  Building2,
-  User,
-  Mail,
-  Phone,
-  Hash,
-  Sparkles
-} from 'lucide-react';
 import ViewSwitcherFooter from '@/components/mobile/ViewSwitcherFooter';
 import { getNowInTimezone } from '@/lib/date-utils';
-import { calculateDayAvailability, OPERATIONAL_SLOTS } from '@/lib/booking-capacity';
+import { BookingItem, BookingFormData, SavedRequesterProfile, REQUESTER_PROFILE_STORAGE_KEY } from '@/types/booking';
+import { FacilityConfig, DEFAULT_FACILITY_CONFIG, generateTimeSlots } from '@/lib/facility-config';
+import { validateBookingInput } from '@/lib/booking-validation';
 
-interface BookingItem {
-  id: string;
-  bookingCode: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-  department: string;
-  fullName: string;
-}
+import BookingPageHeader from '@/components/booking/BookingPageHeader';
+import BookingCalendarCard from '@/components/booking/BookingCalendarCard';
+import BookingFormModal from '@/components/booking/BookingFormModal';
+import BookingRulesModal from '@/components/booking/BookingRulesModal';
+import BookingSuccessModal from '@/components/booking/BookingSuccessModal';
 
-const MONTH_NAMES_TH = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-];
-
-const PRELOAD_MONTHS_AHEAD = 3;
-
-function isTimeOverlapping(start1: string, end1: string, start2: string, end2: string): boolean {
-  return start1 < end2 && end1 > start2;
-}
-
-function formatMonthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function formatDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function getMonthWindow(baseMonthStr: string, monthsAhead: number) {
-  const [yearRaw, monthRaw] = baseMonthStr.split('-').map(Number);
-  const baseYear = Number.isFinite(yearRaw) ? yearRaw : new Date().getFullYear();
-  const baseMonth = Number.isFinite(monthRaw) ? monthRaw - 1 : new Date().getMonth();
-
-  const monthKeys = Array.from({ length: monthsAhead + 1 }, (_, idx) =>
-    formatMonthKey(new Date(baseYear, baseMonth + idx, 1))
-  );
-
-  const startDate = formatDateKey(new Date(baseYear, baseMonth, 1));
-  const endDate = formatDateKey(new Date(baseYear, baseMonth + monthsAhead + 1, 0));
-
-  return { monthKeys, startDate, endDate };
-}
-
-export default function BookingPage() {
+export default function BookingPage({ currentMode = 'desktop' }: { currentMode?: 'desktop' | 'mobile' } = {}) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [bookingsByMonth, setBookingsByMonth] = useState<Record<string, BookingItem[]>>({});
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [facilityConfig, setFacilityConfig] = useState<FacilityConfig>(DEFAULT_FACILITY_CONFIG);
   const [isLoading, setIsLoading] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [successBookingCode, setSuccessBookingCode] = useState<string | null>(null);
+  const [submittedDetails, setSubmittedDetails] = useState<BookingFormData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({});
 
-  const [formData, setFormData] = useState({
+  const [rememberMe, setRememberMe] = useState(false);
+  const [hasSavedProfile, setHasSavedProfile] = useState(false);
+
+  const [formData, setFormData] = useState<BookingFormData>({
+    date: '',
+    startTime: '08:00',
+    endTime: '10:00',
     fullName: '',
     studentId: '',
     email: '',
     phone: '',
     department: '',
     reason: '',
-    startTime: '09:00',
-    endTime: '11:00',
+    borrowedEquipment: [],
   });
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const formattedMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const bookings = useMemo(() => bookingsByMonth[formattedMonthStr] || [], [bookingsByMonth, formattedMonthStr]);
-
-  const nowInTz = useMemo(() => {
-    return getNowInTimezone(settings.timezone);
-  }, [settings.timezone]);
-
-  const todayStr = nowInTz.dateStr;
-  const currentTimeStr = nowInTz.timeStr;
-  const isPastSelectedDate = selectedDate ? selectedDate < todayStr : false;
+  const { dateStr: todayStr, timeStr: nowTimeStr } = useMemo(
+    () => getNowInTimezone(settings.timezone || 'Asia/Bangkok'),
+    [settings.timezone]
+  );
 
   useEffect(() => {
-    fetchSettings();
+    try {
+      const raw = localStorage.getItem(REQUESTER_PROFILE_STORAGE_KEY);
+      if (raw) {
+        const saved: SavedRequesterProfile = JSON.parse(raw);
+        setFormData((prev) => ({ ...prev, ...saved }));
+        setRememberMe(true);
+        setHasSavedProfile(true);
+      }
+    } catch {}
   }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch('/api/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data.settings || {});
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const handleClearSavedProfile = () => {
+    localStorage.removeItem(REQUESTER_PROFILE_STORAGE_KEY);
+    setHasSavedProfile(false);
+    setRememberMe(false);
   };
-
-  const fetchBookingsWindow = useCallback(async (monthStr: string, forceReload = false) => {
-    const { monthKeys, startDate, endDate } = getMonthWindow(monthStr, PRELOAD_MONTHS_AHEAD);
-    const hasAllMonths = monthKeys.every((key) => bookingsByMonth[key] !== undefined);
-
-    if (!forceReload && hasAllMonths) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/bookings?startDate=${startDate}&endDate=${endDate}`);
-      if (res.ok) {
-        const data = await res.json();
-        const grouped: Record<string, BookingItem[]> = {};
-        monthKeys.forEach((key) => {
-          grouped[key] = [];
-        });
-
-        (data.bookings || []).forEach((booking: BookingItem) => {
-          const monthKey = booking.date.slice(0, 7);
-          if (grouped[monthKey]) {
-            grouped[monthKey].push(booking);
-          }
-        });
-
-        setBookingsByMonth((prev) => ({
-          ...prev,
-          ...grouped,
-        }));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [bookingsByMonth]);
 
   useEffect(() => {
-    void fetchBookingsWindow(formattedMonthStr);
-  }, [formattedMonthStr, fetchBookingsWindow]);
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.settings) setSettings(data.settings);
+        if (data?.facilityConfig) setFacilityConfig(data.facilityConfig);
+      })
+      .catch(() => {});
+  }, []);
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-  };
+  const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-  };
-
-  const openDateModal = (dateStr: string) => {
-    setSelectedDate(dateStr);
-    setErrorMessage(null);
-
-    const { dateStr: currentTzDate, timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
-    const isPast = dateStr < currentTzDate;
-    const isToday = dateStr === currentTzDate;
-
-    if (!isPast) {
-      // Find the first available upcoming slot on that date
-      const dayBookings = bookings.filter(
-        (b) => b.date === dateStr && (b.status === 'APPROVED' || b.status === 'PENDING')
-      );
-
-      const firstFreeSlot = OPERATIONAL_SLOTS.find((slot) => {
-        const isPastSlot = isToday && slot.start <= currentTzTime;
-        const isOccupied = dayBookings.some((b) =>
-          isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
-        );
-        return !isPastSlot && !isOccupied;
-      });
-
-      if (firstFreeSlot) {
-        setFormData((prev) => ({
-          ...prev,
-          startTime: firstFreeSlot.start,
-          endTime: firstFreeSlot.end,
-        }));
+  const fetchBookingsForMonth = useCallback(async (monthKey: string) => {
+    try {
+      const res = await fetch(`/api/bookings?month=${monthKey}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookingsByMonth((prev) => ({ ...prev, [monthKey]: data.bookings || [] }));
       }
-    }
+    } catch {}
+  }, []);
 
+  useEffect(() => {
+    fetchBookingsForMonth(currentMonthKey);
+  }, [currentMonthKey, fetchBookingsForMonth]);
+
+  const activeMonthBookings = bookingsByMonth[currentMonthKey] || [];
+  const bookingsOnSelectedDate = useMemo(
+    () => activeMonthBookings.filter((b) => b.date === selectedDate),
+    [activeMonthBookings, selectedDate]
+  );
+
+  const timeSlots = useMemo(
+    () => generateTimeSlots(facilityConfig.openTime, facilityConfig.closeTime, facilityConfig.slotIntervalMinutes),
+    [facilityConfig]
+  );
+
+  const handleSelectDate = (dateStr: string) => {
+    setSelectedDate(dateStr);
+    const bookingsForDate = (bookingsByMonth[dateStr.slice(0, 7)] || activeMonthBookings).filter(
+      (b) => b.date === dateStr
+    );
+    const isToday = dateStr === todayStr;
+    const isPast = dateStr < todayStr;
+
+    const firstAvailable = timeSlots.find((slot) => {
+      const isPastToday = isToday && slot.start <= nowTimeStr;
+      if (isPast || isPastToday) return false;
+      const conflict = bookingsForDate.some(
+        (b) =>
+          (b.status === 'APPROVED' || b.status === 'PENDING') &&
+          slot.start < b.endTime &&
+          slot.end > b.startTime
+      );
+      return !conflict;
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      date: dateStr,
+      startTime: firstAvailable?.start || '',
+      endTime: firstAvailable?.end || '',
+    }));
+    setValidationErrors({});
+    setErrorMessage(null);
     setIsBookingModalOpen(true);
   };
 
-  const closeBookingModal = () => {
-    setIsBookingModalOpen(false);
-    setErrorMessage(null);
+  const handleFormFieldChange = (field: keyof BookingFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (validationErrors[field]) setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  // Active bookings on the selected date (APPROVED and PENDING)
-  const selectedDateBookings = useMemo(() => {
-    return bookings.filter(
-      (b) => b.date === selectedDate && (b.status === 'APPROVED' || b.status === 'PENDING')
-    );
-  }, [bookings, selectedDate]);
-
-  // Real-time conflict detection
-  const conflictDetails = useMemo(() => {
-    if (!selectedDate) return null;
-    if (selectedDate < todayStr) {
-      return { type: 'PAST_DATE', message: 'ไม่อนุญาตให้จองย้อนหลัง กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต' };
-    }
-
-    if (!formData.startTime || !formData.endTime) return null;
-    if (formData.startTime >= formData.endTime) {
-      return { type: 'INVALID_ORDER', message: 'เวลาเริ่มต้นต้องน้อยกว่าเวลาสิ้นสุด' };
-    }
-
-    const { timeStr: currentTzTime } = getNowInTimezone(settings.timezone);
-    if (selectedDate === todayStr && formData.startTime <= currentTzTime) {
-      return { type: 'PAST_TIME', message: 'เวลาเริ่มต้นที่เลือกได้ผ่านไปแล้ว กรุณาเลือกเวลาในอนาคต' };
-    }
-
-    const conflict = selectedDateBookings.find((b) =>
-      isTimeOverlapping(formData.startTime, formData.endTime, b.startTime, b.endTime)
-    );
-
-    if (conflict) {
-      const statusLabel = conflict.status === 'APPROVED' ? 'ได้รับการอนุมัติแล้ว' : 'มีผู้จองแล้ว (รอตรวจสอบ)';
-      return {
-        type: 'OVERLAP',
-        message: `ช่วงเวลานี้ตรงกับการจองที่${statusLabel} (${conflict.startTime} - ${conflict.endTime} น. โดย ${conflict.fullName})`,
-      };
-    }
-
-    return null;
-  }, [formData.startTime, formData.endTime, selectedDate, todayStr, selectedDateBookings, settings.timezone]);
-
-
-  const handleSelectSlot = (slotStart: string, slotEnd: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      startTime: slotStart,
-      endTime: slotEnd,
-    }));
-    setErrorMessage(null);
+  const handleToggleEquipment = (id: string) => {
+    setFormData((prev) => {
+      const cur = prev.borrowedEquipment || [];
+      return { ...prev, borrowedEquipment: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] };
+    });
   };
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-
-    if (conflictDetails) {
-      setErrorMessage(conflictDetails.message);
+    const result = validateBookingInput({ ...formData, date: selectedDate }, { timezone: settings.timezone });
+    if (!result.isValid) {
+      setValidationErrors(result.errors);
+      setErrorMessage(result.firstError || 'กรุณากรอกข้อมูลให้ถูกต้องครบถ้วน');
       return;
     }
-
+    setValidationErrors({});
+    setErrorMessage(null);
     setIsBookingModalOpen(false);
     setIsRuleModalOpen(true);
   };
@@ -284,788 +165,95 @@ export default function BookingPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
+      const payload = { ...formData, date: selectedDate };
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          date: selectedDate,
-        }),
+        body: JSON.stringify(payload),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setIsRuleModalOpen(false);
         setIsBookingModalOpen(true);
         setErrorMessage(data.error || 'ไม่สามารถส่งคำขอจองได้');
         return;
       }
-
+      if (rememberMe) {
+        const { fullName, studentId, email, phone, department } = formData;
+        localStorage.setItem(REQUESTER_PROFILE_STORAGE_KEY, JSON.stringify({ fullName, studentId, email, phone, department }));
+        setHasSavedProfile(true);
+      }
       setIsRuleModalOpen(false);
+      setSubmittedDetails(payload);
       setSuccessBookingCode(data.booking.bookingCode);
-      setFormData({
-        fullName: '',
-        studentId: '',
-        email: '',
-        phone: '',
-        department: '',
-        reason: '',
-        startTime: '09:00',
-        endTime: '11:00',
-      });
-      const selectedMonth = selectedDate.slice(0, 7) || formattedMonthStr;
-      await fetchBookingsWindow(selectedMonth, true);
-    } catch (e) {
-      console.error(e);
+      fetchBookingsForMonth(selectedDate.slice(0, 7) || currentMonthKey);
+    } catch {
       setErrorMessage('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const copyBookingCode = () => {
-    if (successBookingCode) {
-      navigator.clipboard.writeText(successBookingCode);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    }
-  };
-
-  const firstDayIndex = new Date(year, month, 1).getDay();
-  const totalDays = new Date(year, month + 1, 0).getDate();
-
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50 text-slate-800">
-      {/* Sticky Frosted Header */}
-      <header className="sticky top-0 z-40 bg-orange-600/95 backdrop-blur-md border-b border-orange-500/40 text-white shadow-warm-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="bg-white text-orange-600 p-2 rounded-2xl font-bold w-10 h-10 flex items-center justify-center shadow-warm-xs group-hover:scale-105 transition-transform">
-              <Landmark className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <h1 className="font-bold text-base leading-tight tracking-tight text-white drop-shadow-2xs">
-                {settings.site_title || 'สภานักศึกษา มจพ.'}
-              </h1>
-              <p className="text-[11px] text-orange-100 font-medium tracking-wide">
-                {settings.site_subtitle || 'Student Council KMUTNB'}
-              </p>
-            </div>
-          </Link>
+      <BookingPageHeader
+        siteTitle={settings.site_title}
+        siteSubtitle={settings.site_subtitle}
+        facilityConfig={facilityConfig}
+      />
 
-          <nav className="hidden md:flex items-center space-x-1 text-sm font-medium">
-            <Link
-              href="/"
-              className="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition"
-            >
-              หน้าหลัก
-            </Link>
-            <Link
-              href="/booking"
-              className="px-3 py-1.5 rounded-xl bg-orange-700/60 text-white font-semibold shadow-inner border border-orange-400/30 flex items-center gap-1.5"
-            >
-              <CalendarIcon className="w-4 h-4" /> จองห้องประชุม
-            </Link>
-            <Link
-              href="/track"
-              className="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition flex items-center gap-1.5"
-            >
-              <Search className="w-4 h-4" /> ตรวจสอบสถานะ
-            </Link>
-            <Link
-              href="/#channels"
-              className="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition"
-            >
-              ช่องทางติดต่อ
-            </Link>
-            <div className="pl-2">
-              <Link
-                href="/admin/login"
-                className="bg-orange-950/40 hover:bg-orange-950/60 text-orange-100 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold border border-orange-400/30 shadow-xs transition active-press flex items-center gap-1.5"
-              >
-                <Lock className="w-3.5 h-3.5" /> แอดมิน
-              </Link>
-            </div>
-          </nav>
-        </div>
-      </header>
-
-      {/* Hero Subheader */}
-      <section className="bg-gradient-to-b from-orange-600 to-amber-600 text-white py-10 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-mesh-dots opacity-15 pointer-events-none"></div>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-orange-950/30 text-orange-100 px-3 py-1 rounded-full text-xs font-medium mb-2 border border-orange-400/30 backdrop-blur-xs">
-              <CalendarCheck className="w-3.5 h-3.5 text-amber-300" />
-              <span>ระบบจองห้องประชุมออนไลน์ • ป้องกันเวลาซ้อนทับ</span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              ปฏิทินตรวจสอบและจองห้องประชุม
-            </h2>
-            <p className="text-orange-100 text-xs md:text-sm mt-1 max-w-xl font-light">
-              เลือกวันที่ต้องการจองเพื่อดูช่วงเวลาว่าง ระบบจะล็อกช่วงเวลาที่มีการจองแล้วอัตโนมัติ (First-come, First-served)
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/"
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-4 py-2.5 rounded-xl border border-white/20 transition active-press flex items-center gap-1.5 backdrop-blur-xs"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> กลับหน้าหลัก
-            </Link>
-            <Link
-              href="/track"
-              className="bg-white text-orange-600 hover:bg-orange-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-warm-xs transition active-press flex items-center gap-1.5"
-            >
-              <Search className="w-3.5 h-3.5" /> ตรวจสอบสถานะการจอง
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Calendar View */}
       <main className="flex-grow max-w-6xl mx-auto px-4 -mt-4 pb-14 w-full relative z-20">
-        <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/90 shadow-warm">
-          {/* Calendar Top Controls & Legend */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 pb-5 border-b border-slate-100">
-            <div>
-              <h3 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span>เลือกวันที่ต้องการจอง</span>
-                {isLoading && (
-                  <span className="text-xs font-normal text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200 animate-pulse">
-                    กำลังซิงค์ข้อมูล...
-                  </span>
-                )}
-              </h3>
-              <p className="text-slate-500 text-xs mt-0.5">
-                คลิกที่ช่องวันที่เพื่อเปิดตารางช่วงเวลาและกรอกแบบฟอร์มคำขอจอง
-              </p>
-            </div>
-
-            {/* Status Legend */}
-            <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
-              <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200"></span> ว่างทั้งวัน
-              </span>
-              <span className="flex items-center gap-1.5 text-amber-800 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-amber-200"></span> ว่างปานกลาง
-              </span>
-              <span className="flex items-center gap-1.5 text-rose-800 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200"></span> ว่างน้อย / เต็ม
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span> ประวัติ
-              </span>
-            </div>
-          </div>
-
-          {/* Month Header Switcher */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-6">
-            <button
-              onClick={prevMonth}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs md:text-sm font-semibold transition active-press flex items-center gap-1 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" /> เดือนก่อนหน้า
-            </button>
-
-            <div className="text-center order-first sm:order-none">
-              <h4 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight">
-                {MONTH_NAMES_TH[month]} <span className="tabular-nums font-mono text-orange-600">{year + 543}</span>
-              </h4>
-              <button
-                onClick={() => void fetchBookingsWindow(formattedMonthStr, true)}
-                disabled={isLoading}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-60 disabled:cursor-not-allowed transition"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                รีโหลดข้อมูล
-              </button>
-            </div>
-
-            <button
-              onClick={nextMonth}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs md:text-sm font-semibold transition active-press flex items-center gap-1 cursor-pointer"
-            >
-              เดือนถัดไป <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 mb-2 tracking-wider uppercase">
-            <div className="text-rose-500 py-1">อา.</div>
-            <div className="py-1">จ.</div>
-            <div className="py-1">อ.</div>
-            <div className="py-1">พ.</div>
-            <div className="py-1">พฤ.</div>
-            <div className="py-1">ศ.</div>
-            <div className="text-blue-500 py-1">ส.</div>
-          </div>
-
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-2 md:gap-2.5">
-            {Array.from({ length: firstDayIndex }).map((_, i) => (
-              <div
-                key={`empty-${i}`}
-                className="h-24 md:h-28 bg-slate-50/40 rounded-2xl border border-dashed border-slate-200/60"
-              ></div>
-            ))}
-
-            {Array.from({ length: totalDays }).map((_, i) => {
-              const day = i + 1;
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isToday = dateStr === todayStr;
-              const isPast = dateStr < todayStr;
-
-              const dayBookings = bookings.filter((b) => b.date === dateStr);
-              const activeBookings = dayBookings.filter(
-                (b) => b.status === 'APPROVED' || b.status === 'PENDING'
-              );
-
-              const hasApproved = dayBookings.some((b) => b.status === 'APPROVED');
-              const hasPending = dayBookings.some((b) => b.status === 'PENDING');
-              const availability = calculateDayAvailability(dateStr, dayBookings, isPast);
-
-              let cardStyle =
-                'bg-white hover:border-orange-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800';
-              let badgeDot = null;
-
-              if (isPast) {
-                cardStyle =
-                  'bg-slate-100/60 border-slate-200/60 text-slate-400 hover:border-slate-300';
-              } else if (availability.statusLevel === 'FULL') {
-                cardStyle =
-                  'bg-rose-50/40 border-rose-300 hover:border-rose-500 hover:shadow-warm-sm text-slate-800';
-                badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 shadow-xs" title="เต็มทุกช่วง"></span>
-                );
-              } else if (availability.statusLevel === 'LOW') {
-                cardStyle =
-                  'bg-rose-50/20 border-rose-200 hover:border-rose-400 hover:shadow-warm-sm text-slate-800';
-                badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 shadow-xs" title="ว่างน้อย"></span>
-                );
-              } else if (availability.statusLevel === 'MODERATE') {
-                cardStyle =
-                  'bg-amber-50/30 border-amber-300 hover:border-amber-500 hover:shadow-warm-sm text-slate-800';
-                badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 shadow-xs" title="ว่างปานกลาง"></span>
-                );
-              } else if (hasPending) {
-                cardStyle =
-                  'bg-amber-50/20 border-amber-200 hover:border-amber-400 hover:shadow-warm-sm text-slate-800';
-                badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 shadow-xs" title="มีรายการรอตรวจสอบ"></span>
-                );
-              } else {
-                cardStyle =
-                  'bg-white hover:border-emerald-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800';
-                badgeDot = (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 shadow-xs" title="ว่างทั้งวัน"></span>
-                );
-              }
-
-              return (
-                <div
-                  key={dateStr}
-                  onClick={() => openDateModal(dateStr)}
-                  className={`${cardStyle} border rounded-2xl p-2.5 md:p-3 h-24 md:h-28 flex flex-col justify-between cursor-pointer transition-all duration-200 group relative active-press`}
-                >
-                  <div className="flex justify-between items-start">
-                    <span
-                      className={`text-xs md:text-sm font-bold tabular-nums font-mono ${
-                        isToday
-                          ? 'bg-orange-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-xs -ml-0.5 -mt-0.5'
-                          : isPast
-                          ? 'text-slate-400 font-normal'
-                          : 'text-slate-700 group-hover:text-orange-600 transition-colors'
-                      }`}
-                    >
-                      {day}
-                    </span>
-                    {badgeDot}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {/* Availability Badge Pill */}
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-[10px] md:text-[11px] font-semibold px-2 py-0.5 rounded-lg inline-block border leading-tight ${availability.colorClasses.bg} ${availability.colorClasses.text} ${availability.colorClasses.border}`}
-                      >
-                        {availability.label}
-                      </span>
-                    </div>
-
-                    {/* Mini Capacity Progress Bar */}
-                    <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${availability.colorClasses.bar}`}
-                        style={{ width: `${availability.freePercentage}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <BookingCalendarCard
+          currentDate={currentDate}
+          onPrevMonth={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+          onNextMonth={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+          onTodayMonth={() => setCurrentDate(new Date())}
+          onSelectDate={handleSelectDate}
+          selectedDate={selectedDate}
+          bookings={activeMonthBookings}
+          closedDates={facilityConfig.closedDates || []}
+          todayStr={todayStr}
+        />
       </main>
 
-      {/* Booking Form Modal */}
-      {isBookingModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 md:p-7 shadow-2xl my-8 border border-slate-100 relative">
-            <div className="flex justify-between items-start mb-4 pb-3 border-b border-slate-100">
-              <div>
-                {isPastSelectedDate ? (
-                  <>
-                    <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200 mb-1">
-                      <Clock className="w-3.5 h-3.5" /> ประวัติการใช้ห้อง
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                      รายการจองห้องประชุมวันที่ <span className="text-orange-600 font-mono tabular-nums">{selectedDate}</span>
-                    </h3>
-                  </>
-                ) : (
-                  <>
-                    <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/80 mb-1">
-                      <CalendarCheck className="w-3.5 h-3.5" /> แบบฟอร์มขอใช้ห้อง
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                      จองห้องประชุมวันที่ <span className="text-orange-600 font-mono tabular-nums">{selectedDate}</span>
-                    </h3>
-                  </>
-                )}
-              </div>
-              <button
-                onClick={closeBookingModal}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <BookingFormModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        selectedDate={selectedDate}
+        facilityConfig={facilityConfig}
+        formData={formData}
+        timeSlots={timeSlots}
+        bookingsOnSelectedDate={bookingsOnSelectedDate}
+        todayStr={todayStr}
+        nowTimeStr={nowTimeStr}
+        validationErrors={validationErrors}
+        rememberMe={rememberMe}
+        hasSavedProfile={hasSavedProfile}
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+        onToggleEquipment={handleToggleEquipment}
+        onSelectSlot={(start, end) => setFormData((prev) => ({ ...prev, startTime: start, endTime: end }))}
+        onFormFieldChange={handleFormFieldChange}
+        onToggleRememberMe={setRememberMe}
+        onClearSavedProfile={handleClearSavedProfile}
+        onSubmit={handlePreSubmit}
+      />
 
-            {isPastSelectedDate ? (
-              <div>
-                {/* Past Date Notice */}
-                <div className="mb-4 p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center gap-3 text-slate-700">
-                  <div className="w-10 h-10 rounded-xl bg-slate-200/70 flex items-center justify-center shrink-0 text-slate-500">
-                    <CalendarX className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xs text-slate-800">ไม่อนุญาตให้จองย้อนหลัง</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      วันที่ดังกล่าวได้ผ่านพ้นไปแล้ว สามารถเปิดดูข้อมูลประวัติการจองเดิมได้เท่านั้น
-                    </p>
-                  </div>
-                </div>
+      <BookingRulesModal
+        isOpen={isRuleModalOpen}
+        rules={facilityConfig.bookingRules || []}
+        onClose={() => { setIsRuleModalOpen(false); setIsBookingModalOpen(true); }}
+        onConfirm={handleFinalConfirm}
+        isLoading={isLoading}
+      />
 
-                {/* Existing Bookings list for past date */}
-                {selectedDateBookings.length > 0 ? (
-                  <div className="mb-4 bg-slate-50 p-3.5 rounded-2xl text-xs text-slate-600 border border-slate-200">
-                    <span className="font-bold text-slate-700 block mb-2 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" /> รายการจองทั้งหมดในวันนี้:
-                    </span>
-                    <div className="space-y-1.5">
-                      {selectedDateBookings.map((b) => (
-                        <div
-                          key={b.id}
-                          className="flex justify-between items-center py-1 border-b border-slate-200/70 last:border-0"
-                        >
-                          <span className="font-mono tabular-nums font-semibold text-slate-800">
-                            {b.startTime} - {b.endTime} น.
-                            <span className="text-slate-500 font-sans font-normal ml-2">
-                              ({b.fullName} • {b.department})
-                            </span>
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              b.status === 'APPROVED'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                : 'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}
-                          >
-                            {b.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 text-center text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                    ไม่มีรายการจองห้องประชุมในวันนี้
-                  </div>
-                )}
+      <BookingSuccessModal
+        bookingCode={successBookingCode}
+        bookingDetails={submittedDetails}
+        onClose={() => { setSuccessBookingCode(null); setSubmittedDetails(null); }}
+      />
 
-                <div className="mt-5 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={closeBookingModal}
-                    className="px-5 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition font-medium cursor-pointer text-xs active-press"
-                  >
-                    ปิดหน้าต่าง
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {/* Existing Active Bookings list */}
-                {selectedDateBookings.length > 0 && (
-                  <div className="mb-4 bg-slate-50 p-3.5 rounded-2xl text-xs text-slate-600 border border-slate-200">
-                    <span className="font-bold text-slate-700 block mb-2 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" /> ช่วงเวลาที่ถูกจองแล้วในวันนี้ (ไม่สามารถจองซ้อนได้):
-                    </span>
-                    <div className="space-y-1.5">
-                      {selectedDateBookings.map((b) => (
-                        <div
-                          key={b.id}
-                          className="flex justify-between items-center py-1 border-b border-slate-200/70 last:border-0"
-                        >
-                          <span className="font-mono tabular-nums font-semibold text-slate-800">
-                            {b.startTime} - {b.endTime} น.
-                            <span className="text-slate-500 font-sans font-normal ml-2">
-                              ({b.fullName} • {b.department})
-                            </span>
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              b.status === 'APPROVED'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                : 'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}
-                          >
-                            {b.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Notice if all slots for today have already passed */}
-                {selectedDate === todayStr && OPERATIONAL_SLOTS.every((slot) => slot.start <= currentTimeStr) && (
-                  <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-2xl flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
-                    <span>รอบเวลาเปิดใช้งานสำหรับวันนี้ผ่านพ้นไปหมดแล้ว กรุณาเลือกวันอื่น</span>
-                  </div>
-                )}
-
-                {/* Interactive Time Slot Selector Grid (08:00 - 20:00) */}
-                <div className="mb-5">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-slate-800">
-                      เลือกช่วงเวลาเปิดใช้งาน (08:00 - 20:00 น.)
-                    </label>
-                    <span className="text-[11px] text-slate-400">คลิกบล็อกเวลาที่ว่าง</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {OPERATIONAL_SLOTS.map((slot) => {
-                      const conflict = selectedDateBookings.find((b) =>
-                        isTimeOverlapping(slot.start, slot.end, b.startTime, b.endTime)
-                      );
-
-                      const isOccupied = !!conflict;
-                      const isPastSlot = selectedDate === todayStr && slot.start <= currentTimeStr;
-                      const isSelected =
-                        formData.startTime <= slot.start && formData.endTime >= slot.end;
-
-                      let slotClass =
-                        'border border-slate-200 bg-white hover:border-orange-500 hover:bg-orange-50/50 text-slate-700 cursor-pointer shadow-2xs';
-
-                      if (isPastSlot) {
-                        slotClass =
-                          'border-slate-200/80 bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60';
-                      } else if (isOccupied) {
-                        if (conflict?.status === 'APPROVED') {
-                          slotClass =
-                            'border-emerald-200/80 bg-emerald-50/60 text-emerald-800 cursor-not-allowed opacity-75';
-                        } else {
-                          slotClass =
-                            'border-amber-200/80 bg-amber-50/60 text-amber-800 cursor-not-allowed opacity-75';
-                        }
-                      } else if (isSelected) {
-                        slotClass =
-                          'border-orange-600 bg-orange-600 text-white shadow-warm-xs font-bold';
-                      }
-
-                      return (
-                        <button
-                          key={slot.label}
-                          type="button"
-                          disabled={isOccupied || isPastSlot}
-                          onClick={() => handleSelectSlot(slot.start, slot.end)}
-                          className={`p-2 rounded-xl text-center text-xs transition active-press flex flex-col items-center justify-center min-h-[52px] ${slotClass}`}
-                        >
-                          <span className="font-mono tabular-nums text-xs">{slot.label}</span>
-                          <span className="text-[10px] mt-0.5">
-                            {isPastSlot
-                              ? 'เลยเวลาแล้ว'
-                              : isOccupied
-                              ? conflict?.status === 'APPROVED'
-                                ? 'อนุมัติแล้ว'
-                                : 'รอตรวจสอบ'
-                              : isSelected
-                              ? '✓ เลือกอยู่'
-                              : 'ว่าง'}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-
-            {/* Error or Conflict Alert Banner */}
-            {conflictDetails && (
-              <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-700 text-xs p-3.5 rounded-2xl flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                <span className="font-medium">{conflictDetails.message}</span>
-              </div>
-            )}
-
-            {errorMessage && !conflictDetails && (
-              <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-700 text-xs p-3.5 rounded-2xl flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                <span className="font-medium">{errorMessage}</span>
-              </div>
-            )}
-
-            {/* Form Inputs */}
-            <form onSubmit={handlePreSubmit} className="space-y-3.5 text-sm">
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">เวลาเริ่มต้น</label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono tabular-nums"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">เวลาสิ้นสุด</label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono tabular-nums"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1 text-xs">ชื่อ-นามสกุล ผู้จอง</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="เช่น นายสมชาย ใจดี"
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1 text-xs">รหัสนักศึกษา</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.studentId}
-                    onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                    placeholder="เช่น 6501012345"
-                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1 text-xs">เบอร์ติดต่อ</label>
-                  <input
-                    type="tel"
-                    required
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="เช่น 0812345678"
-                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1 text-xs">อีเมลผู้จอง</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="เช่น student@kmutnb.ac.th"
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1 text-xs">หน่วยงาน / ชมรม / สโมสร</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="เช่น สโมสรนักศึกษาคณะวิศวกรรมศาสตร์"
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1 text-xs">เหตุผลและวาระการประชุม</label>
-                <textarea
-                  rows={2}
-                  required
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  placeholder="ระบุวาระการประชุมหรือกิจกรรมพอสังเขป"
-                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500"
-                ></textarea>
-              </div>
-
-              <div className="flex justify-end space-x-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={closeBookingModal}
-                  className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition font-medium cursor-pointer text-xs active-press"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={!!conflictDetails}
-                  className="px-5 py-2.5 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition font-semibold cursor-pointer shadow-warm-xs disabled:opacity-50 disabled:cursor-not-allowed text-xs active-press"
-                >
-                  ตรวจสอบกฎระเบียบและยืนยัน
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
-  )}
-
-      {/* Rules Modal */}
-      {isRuleModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl text-center border border-slate-100">
-            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl shadow-warm-xs">
-              <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">กฎระเบียบการใช้ห้องประชุม</h3>
-            <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-4 text-xs text-amber-900 text-left mb-6 space-y-2 whitespace-pre-line leading-relaxed">
-              {settings.rules_content ||
-                `1. ห้ามนำอาหารและเครื่องดื่ม (ยกเว้นน้ำเปล่า) เข้ามารับประทานในห้องประชุมเด็ดขาด\n2. ช่วยกันรักษาความสะอาด ปิดไฟ และเครื่องปรับอากาศทุกครั้งหลังใช้งานเสร็จ\n⚠️ คำเตือน: หากทำผิดกฎระเบียบ ท่านจะไม่สามารถจองห้องประชุมได้อีกเป็นเวลา 2 เดือนเต็ม`}
-            </div>
-            <div className="flex space-x-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRuleModalOpen(false);
-                  setIsBookingModalOpen(true);
-                }}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition font-medium text-xs cursor-pointer active-press"
-              >
-                ย้อนกลับ
-              </button>
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleFinalConfirm}
-                className="flex-1 py-2.5 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition font-semibold text-xs cursor-pointer shadow-warm-xs disabled:opacity-50 active-press"
-              >
-                {isLoading ? 'กำลังบันทึก...' : 'ยอมรับและยืนยันการจอง'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Booking Code Modal (Ticket Style) */}
-      {successBookingCode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-7 shadow-2xl text-center border border-slate-100 relative">
-            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-warm-xs">
-              <CheckCircle2 className="w-8 h-8 stroke-[2.2]" />
-            </div>
-            <h3 className="text-xl font-extrabold text-slate-900 mb-1 tracking-tight">
-              ส่งคำขอจองสำเร็จ
-            </h3>
-            <p className="text-xs text-slate-500 mb-5 font-light">
-              คำขอของคุณอยู่ในสถานะ <span className="text-amber-600 font-semibold">รอการอนุมัติ</span> กรุณาบันทึกรหัสนี้ไว้เพื่อใช้ตรวจสอบ
-            </p>
-
-            {/* Ticket Box */}
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-6 relative group">
-              <div className="text-[11px] text-orange-700 font-semibold uppercase tracking-wider">
-                Booking Code (รหัสการจอง)
-              </div>
-              <div className="text-lg md:text-xl font-bold text-orange-600 tracking-wider font-mono my-2 select-all">
-                {successBookingCode}
-              </div>
-              <button
-                type="button"
-                onClick={copyBookingCode}
-                className="inline-flex items-center gap-1.5 text-xs text-orange-700 bg-white border border-orange-200/80 px-3 py-1 rounded-lg hover:bg-orange-100/60 transition active-press cursor-pointer shadow-2xs"
-              >
-                {copiedCode ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-700 font-semibold">คัดลอกรหัสแล้ว</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>คลิกเพื่อคัดลอก</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="flex space-x-2.5">
-              <Link
-                href={`/track?q=${successBookingCode}`}
-                className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition font-medium text-xs flex items-center justify-center gap-1.5 shadow-warm-xs active-press"
-              >
-                <Search className="w-3.5 h-3.5" /> ดูสถานะคำขอนี้
-              </Link>
-              <button
-                type="button"
-                onClick={() => setSuccessBookingCode(null)}
-                className="py-2.5 px-5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-medium text-xs cursor-pointer active-press"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-10 text-xs mt-auto border-t border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left">
-            <p className="font-semibold text-slate-200">สภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.)</p>
-            <p className="text-slate-500 mt-1">
-              อีเมล: {settings.contact_email || 'council@kmutnb.ac.th'} | โทร: {settings.contact_phone || '02-555-2000 ต่อ 1135'}
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="hover:text-white transition">หน้าหลัก</Link>
-            <Link href="/track" className="hover:text-white transition">ตรวจสอบการจอง</Link>
-            <Link href="/admin/login" className="hover:text-white transition">สำหรับผู้ดูแลระบบ</Link>
-          </div>
-        </div>
-      </footer>
-      <ViewSwitcherFooter currentMode="desktop" />
+      <ViewSwitcherFooter currentMode={currentMode} />
     </div>
   );
 }

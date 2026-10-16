@@ -35,7 +35,8 @@ function MobileLoginForm() {
         return;
       }
 
-      router.push('/m/admin/dashboard');
+      const callbackUrl = searchParams.get('callbackUrl');
+      router.push(callbackUrl && callbackUrl.startsWith('/') ? callbackUrl : '/m/admin/dashboard');
     } catch (e) {
       console.error(e);
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');

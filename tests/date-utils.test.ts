@@ -68,3 +68,48 @@ describe('date-utils timezone & backdate functions', () => {
     expect(resTomorrow.reason).toBeUndefined();
   });
 });
+
+import { buildGoogleCalendarUrl, generateIcsContent } from '@/lib/calendar-export';
+
+describe('Calendar Export functions (buildGoogleCalendarUrl & generateIcsContent)', () => {
+  const sampleBooking = {
+    bookingCode: 'KMUTNB-2026-0001-9999',
+    date: '2026-10-20',
+    startTime: '09:00',
+    endTime: '12:00',
+    fullName: 'สมหญิง จริงใจ',
+    department: 'คณะครุศาสตร์อุตสาหกรรม',
+    reason: 'สัมมนาวิชาการนักศึกษา',
+    status: 'APPROVED',
+  };
+
+  test('buildGoogleCalendarUrl builds valid Google Calendar URL', () => {
+    const url = buildGoogleCalendarUrl(sampleBooking);
+    expect(url).toContain('https://calendar.google.com/calendar/render');
+    expect(url).toContain('dates=20261020T090000%2F20261020T120000');
+    expect(url).toContain('ctz=Asia%2FBangkok');
+    expect(url).toContain('KMUTNB-2026-0001-9999');
+  });
+
+  test('generateIcsContent generates valid RFC 5545 string', () => {
+    const ics = generateIcsContent(sampleBooking);
+    expect(ics).toContain('BEGIN:VCALENDAR');
+    expect(ics).toContain('VERSION:2.0');
+    expect(ics).toContain('BEGIN:VEVENT');
+    expect(ics).toContain('UID:KMUTNB-2026-0001-9999@sc.kmutnb.ac.th');
+    expect(ics).toContain('DTSTART;TZID=Asia/Bangkok:20261020T090000');
+    expect(ics).toContain('DTEND;TZID=Asia/Bangkok:20261020T120000');
+    expect(ics).toContain('STATUS:CONFIRMED');
+    expect(ics).toContain('BEGIN:VALARM');
+    expect(ics).toContain('TRIGGER:-PT30M');
+    expect(ics).toContain('END:VALARM');
+    expect(ics).toContain('END:VEVENT');
+    expect(ics).toContain('END:VCALENDAR');
+  });
+
+  test('generateIcsContent marks PENDING bookings as TENTATIVE', () => {
+    const ics = generateIcsContent({ ...sampleBooking, status: 'PENDING' });
+    expect(ics).toContain('STATUS:TENTATIVE');
+  });
+});
+

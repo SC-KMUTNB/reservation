@@ -8,16 +8,26 @@ import {
   maskSecret,
   SENSITIVE_SETTING_KEYS,
 } from '@/lib/encryption';
+import { getFacilityConfig, saveFacilityConfig } from '@/lib/facility-config';
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getSessionFromRequest(request);
     const isSuperAdmin = session?.role === 'SUPER_ADMIN';
 
-    const settings = await prisma.siteSetting.findMany();
+    const settings = await prisma.siteSetting.findMany({
+      where: {
+        key: {
+          not: 'facility_config_json',
+        },
+      },
+    });
     const settingsMap: Record<string, string> = {};
 
     for (const s of settings) {
+      if (s.key === 'facility_config_json') {
+        continue;
+      }
       if (SENSITIVE_SETTING_KEYS.includes(s.key)) {
         if (isSuperAdmin) {
           // If a value exists, return masked placeholder so client knows it is configured
@@ -29,7 +39,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ settings: settingsMap, isSuperAdmin });
+    const facilityConfig = await getFacilityConfig();
+
+    return NextResponse.json({ settings: settingsMap, isSuperAdmin, facilityConfig });
   } catch (error) {
     console.error('Error fetching settings:', error);
     return NextResponse.json({ error: 'ไม่สามารถดึงข้อมูลการตั้งค่าได้' }, { status: 500 });
@@ -47,43 +59,51 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { settings } = body;
+    const { settings, facilityConfig } = body;
 
-    if (!settings || typeof settings !== 'object') {
-      return NextResponse.json({ error: 'รูปแบบข้อมูลไม่ถูกต้อง' }, { status: 400 });
+    let savedFacilityConfig = null;
+    if (facilityConfig && typeof facilityConfig === 'object') {
+      savedFacilityConfig = await saveFacilityConfig(facilityConfig);
     }
 
-    for (const [key, rawValue] of Object.entries(settings)) {
-      const stringValue = String(rawValue ?? '').trim();
-
-      if (SENSITIVE_SETTING_KEYS.includes(key)) {
-        // If masked (starts with ••••), admin did not change the existing secret -> do not overwrite
-        if (stringValue.startsWith('••')) {
+    if (settings && typeof settings === 'object') {
+      for (const [key, rawValue] of Object.entries(settings)) {
+        // Prevent raw settings object from ever overwriting the dynamic facility configuration
+        if (key === 'facility_config_json') {
           continue;
         }
 
-        let valueToSave = '';
-        if (stringValue) {
-          valueToSave = encryptSecret(stringValue);
-        }
+        const stringValue = String(rawValue ?? '').trim();
 
-        await prisma.siteSetting.upsert({
-          where: { key },
-          update: { value: valueToSave },
-          create: {
-            key,
-            value: valueToSave,
-          },
-        });
-      } else {
-        await prisma.siteSetting.upsert({
-          where: { key },
-          update: { value: stringValue },
-          create: {
-            key,
-            value: stringValue,
-          },
-        });
+        if (SENSITIVE_SETTING_KEYS.includes(key)) {
+          // If masked (starts with ••••), admin did not change the existing secret -> do not overwrite
+          if (stringValue.startsWith('••')) {
+            continue;
+          }
+
+          let valueToSave = '';
+          if (stringValue) {
+            valueToSave = encryptSecret(stringValue);
+          }
+
+          await prisma.siteSetting.upsert({
+            where: { key },
+            update: { value: valueToSave },
+            create: {
+              key,
+              value: valueToSave,
+            },
+          });
+        } else {
+          await prisma.siteSetting.upsert({
+            where: { key },
+            update: { value: stringValue },
+            create: {
+              key,
+              value: stringValue,
+            },
+          });
+        }
       }
     }
 
@@ -98,7 +118,11 @@ export async function PUT(request: NextRequest) {
       userId: session.id,
     });
 
-    return NextResponse.json({ success: true, message: 'บันทึกการตั้งค่าเรียบร้อยแล้ว' });
+    return NextResponse.json({
+      success: true,
+      message: 'บันทึกการตั้งค่าเรียบร้อยแล้ว',
+      facilityConfig: savedFacilityConfig,
+    });
   } catch (error) {
     console.error('Error updating settings:', error);
     return NextResponse.json({ error: 'ไม่สามารถบันทึกการตั้งค่าได้' }, { status: 500 });
