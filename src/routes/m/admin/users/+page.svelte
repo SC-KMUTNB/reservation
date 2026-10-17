@@ -1,5 +1,5 @@
 <script lang="ts">
-  import UsersPage from '../../admin/users/+page.svelte';
+  import AdminUsersView from '$lib/components/admin/views/AdminUsersView.svelte';
 </script>
 
-<UsersPage />
+<AdminUsersView />

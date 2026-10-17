@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ChangelogPage from '../../admin/changelog/+page.svelte';
+  import AdminChangelogView from '$lib/components/admin/views/AdminChangelogView.svelte';
 </script>
 
-<ChangelogPage />
+<AdminChangelogView />

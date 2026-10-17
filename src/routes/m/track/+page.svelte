@@ -1,5 +1,5 @@
 <script lang="ts">
-  import TrackPage from '../track/+page.svelte';
+  import TrackFlow from '$lib/components/track/TrackFlow.svelte';
 </script>
 
-<TrackPage />
+<TrackFlow currentMode="mobile" />

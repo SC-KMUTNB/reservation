@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SettingsPage from '../../admin/settings/+page.svelte';
+  import AdminSettingsView from '$lib/components/admin/views/AdminSettingsView.svelte';
 </script>
 
-<SettingsPage />
+<AdminSettingsView />

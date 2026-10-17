@@ -1,5 +1,5 @@
 <script lang="ts">
-  import AdminDashboardPage from '../../admin/dashboard/+page.svelte';
+  import AdminDashboardView from '$lib/components/admin/views/AdminDashboardView.svelte';
 </script>
 
-<AdminDashboardPage />
+<AdminDashboardView />

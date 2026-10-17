@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SetupPasswordPage from '../../admin/setup-password/+page.svelte';
+  import AdminSetupPasswordView from '$lib/components/admin/views/AdminSetupPasswordView.svelte';
 </script>
 
-<SetupPasswordPage />
+<AdminSetupPasswordView />

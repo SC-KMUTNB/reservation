@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ReportsPage from '../../admin/reports/+page.svelte';
+  import AdminReportsView from '$lib/components/admin/views/AdminReportsView.svelte';
 </script>
 
-<ReportsPage />
+<AdminReportsView />
