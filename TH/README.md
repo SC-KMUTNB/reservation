@@ -3,14 +3,15 @@
 
 🌐 **ภาษา / Language:** [🇬🇧 English Version](../README.md) | **🇹🇭 ภาษาไทย**
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.3.7-black?style=flat&logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.3.0-blue?style=flat&logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-2.0+-FF3E00?style=flat&logo=svelte)](https://svelte.dev/)
+[![Svelte 5](https://img.shields.io/badge/Svelte-5.0+_(Runes)-FF3E00?style=flat&logo=svelte)](https://svelte.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0+-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.2+-fbf0df?style=flat&logo=bun)](https://bun.sh/)
 [![Prisma](https://img.shields.io/badge/Prisma-6.4+-2D3748?style=flat&logo=prisma)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 
-เว็บแอปพลิเคชันระบบจองห้องประชุมและสถานที่สำหรับสภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.) พัฒนาด้วยเทคโนโลยีฟูลสแต็กระดับ Production ประกอบด้วย **Next.js 16 (App Router พร้อม Turbopack)**, **React 19**, **TypeScript**, **Tailwind CSS v4**, **Prisma ORM**, และฐานข้อมูล **PostgreSQL** โดยใช้ **Bun** เป็น Runtime และ Package Manager
+เว็บแอปพลิเคชันระบบจองห้องประชุมและสถานที่สำหรับสภานักศึกษา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.) พัฒนาด้วยเทคโนโลยีฟูลสแต็กระดับ Production ที่เน้นความรวดเร็วและประสิทธิภาพสูง ประกอบด้วย **SvelteKit 2+**, **Svelte 5 (Runes: `$state`, `$derived`, `$effect`)**, **Vite 8**, **TypeScript**, **Tailwind CSS v4**, **Prisma ORM**, และฐานข้อมูล **PostgreSQL** โดยใช้ **Bun** เป็น Runtime และ Package Manager
 
 ---
 
@@ -45,7 +46,7 @@
 - **ระบบส่งคำเชิญแอดมินใหม่ (Invitation Flow):** ส่งลิงก์คำเชิญผ่านอีเมลเพื่อให้แอดมินใหม่ตั้งรหัสผ่านด้วยตนเองอย่างปลอดภัย (`/admin/setup-password`)
 
 ### 4. ระบบประวัติการอัปเดตแบบไดนามิกจาก GitHub (`/admin/changelog`)
-- **ดึงข้อมูลจาก GitHub Releases:** ดึงข้อมูลประวัติการพัฒนาจาก GitHub Releases (`SC-KMUTNB/reservation`) ผ่าน API พร้อมระบบแคช ISR (1 ชั่วโมง) ลดขนาด Client Bundle ของเว็บไซต์ลงอย่างมาก
+- **ดึงข้อมูลจาก GitHub Releases:** ดึงข้อมูลประวัติการพัฒนาจาก GitHub Releases (`SC-KMUTNB/reservation`) ผ่าน API พร้อมระบบแคช (1 ชั่วโมง) ลดขนาด Client Bundle ของเว็บไซต์ลงอย่างมาก
 - **จัดหมวดหมู่เวอร์ชันตามมาตรฐาน SemVer:** จำแนกเวอร์ชันเป็น **Major** (`vX.0.0`), **Minor** (`v1.X.0`), และ **Patch** (`v1.X.Y`) พร้อมตัวกรองและสถิติแยกประเภท
 - **ตัวแปลง Markdown เป็น Badge สี:** แปลงหัวข้อใน Release Notes เป็นป้ายหมวดหมู่สวยงาม (✨ ฟีเจอร์ใหม่, 🐛 แก้ไขข้อผิดพลาด, ⚡ ปรับปรุงระบบ, 🛡️ ความปลอดภัย)
 - **ปุ่มรีเฟรชข้อมูล (Force Refresh):** สำหรับผู้ดูแลระบบเพื่อดึงข้อมูลล่าสุดจาก GitHub ทันทีหลังปล่อยเวอร์ชันใหม่
@@ -62,13 +63,26 @@
 - ตัวกรองรายงาน: กำหนดช่วงวันที่เอง, เดือนปัจจุบัน, เดือนที่แล้ว หรือเลือกตามสถานะ
 
 ### 7. ยกระดับความปลอดภัย (Security Hardening)
-- **Edge Middleware:** ป้องกันเส้นทาง `/admin/*` และ `/m/admin/*` ด้วย JOSE JWT ตรวจสอบความถูกต้องอย่างเข้มงวด
+- **SvelteKit Server Hooks (`hooks.server.ts`):** ป้องกันเส้นทาง `/admin/*` และ `/m/admin/*` ด้วย JOSE JWT ตรวจสอบความถูกต้องอย่างเข้มงวด
 - **ระบบจำกัดความถี่ตาม IP (Sliding-Window Rate Limiting):** ป้องกันการยิงสแปมหรือโจมตี API
 - **ป้องกันการจองย้อนหลังตาม Timezone:** ตรวจสอบไม่ให้ผู้ใช้ทั่วไปจองวันที่ในอดีตหรือเวลาที่ล่วงเลยไปแล้ว
 - **เข้ารหัสรหัสผ่าน:** ใช้มาตรฐานการแฮชรหัสผ่านด้วย bcrypt
 
 ### 8. สถาปัตยกรรมสำหรับอุปกรณ์มือถือโดยเฉพาะ (`/m/*`)
 - หน้าเว็บที่ออกแบบและปรับแต่ง Layout ให้เหมาะสมกับสมาร์ตโฟน 100% ทั้งหน้าจอง (`/m/booking`), หน้าติดตามสถานะ (`/m/track`) และแดชบอร์ดแอดมิน (`/m/admin/*`)
+
+---
+
+## 💻 Tech Stack & สถาปัตยกรรมระบบ
+
+- **Runtime & Package Manager:** [Bun](https://bun.sh) (v1.2+)
+- **Framework:** SvelteKit 2+ / Vite 8+
+- **Reactive UI Library:** Svelte 5 (Runes: `$state`, `$derived`, `$effect`)
+- **Styling:** Tailwind CSS v4 & Lucide Svelte
+- **Database:** PostgreSQL (ผ่าน Prisma ORM 6.4+)
+- **Authentication:** JOSE JWT (HTTP-only cookies) & Bcrypt
+- **Reports:** ExcelJS
+- **Email:** Nodemailer ร่วมกับ Google SMTP
 
 ---
 
@@ -111,7 +125,7 @@ bun run seed
 ```bash
 bun run dev
 ```
-เปิดเบราว์เซอร์ไปที่ [http://localhost:3000](http://localhost:3000)
+เปิดเบราว์เซอร์ไปที่ [http://localhost:5173](http://localhost:5173)
 
 ---
 
@@ -119,11 +133,12 @@ bun run dev
 
 | คำสั่ง | คำสั่งที่ใช้รัน | หน้าที่การทำงาน |
 | :--- | :--- | :--- |
-| **รันเซิร์ฟเวอร์ Dev** | `bun run dev` | เริ่มต้น Local Development Server ด้วย Turbopack |
-| **บิลด์สำหรับ Production** | `bun run build` | สร้าง Prisma Client และคอมไพล์โปรเจกต์ Next.js |
-| **รันเซิร์ฟเวอร์ Production** | `bun run start` | รันเซิร์ฟเวอร์ในโหมด Production |
-| **รันชุดทดสอบ (Tests)** | `bun test` | รัน Unit & Integration Tests ทั้งหมดของโปรเจกต์ |
-| **ตรวจสอบ Typescript** | `bun run typecheck` | ตรวจสอบ Type ความถูกต้องของโค้ด (`tsc --noEmit`) |
+| **รันเซิร์ฟเวอร์ Dev** | `bun run dev` | เริ่มต้น Local Development Server ด้วย Vite |
+| **บิลด์สำหรับ Production** | `bun run build` | สร้าง Prisma Client และคอมไพล์โปรเจกต์ SvelteKit |
+| **พรีวิว Production Build** | `bun run preview` | ทดสอบรัน Production Bundle บนเครื่อง Local |
+| **ซิงก์ไทป์ SvelteKit** | `bun run prepare` | สร้างไทป์ที่จำเป็นสำหรับ SvelteKit (`svelte-kit sync`) |
+| **รันชุดทดสอบ (Tests)** | `bun test` | รัน Unit & Integration Tests ทั้งหมด (84 รายการ) |
+| **ตรวจสอบ Typescript** | `bun run typecheck` | ซิงก์ไทป์และตรวจสอบ Type โค้ดผ่าน `svelte-check` |
 | **ตรวจสอบ Linter** | `bun run lint` | ตรวจสอบคุณภาพโค้ดด้วย ESLint |
 | **สร้างข้อมูลเริ่มต้น (Seed)** | `bun run seed` | สร้างบัญชีแอดมินและการตั้งค่าระบบเริ่มต้น |
 | **ตรวจโครงสร้าง DB** | `bun run db:ensure` | ตรวจสอบความถูกต้องของคอลัมน์ใน Postgres |
@@ -150,11 +165,12 @@ bun run dev
 
 ## 🚀 การ Deploy ขึ้น Vercel
 
-1. Push โค้ดขึ้น GitHub Repository
-2. Import โปรเจกต์เข้าสู่ **Vercel**
-3. ตั้งค่า **Environment Variables** ในการตั้งค่าโปรเจกต์บน Vercel (`DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_SECRET` ฯลฯ)
-4. Vercel จะรันคำสั่งบิลด์ `prisma generate && next build` โดยอัตโนมัติ
-5. หลัง Deploy เสร็จสิ้น ให้เข้าสู่ระบบแอดมินไปที่ **Admin > Settings** แล้วระบุ **Base URL สำหรับลิงก์ในอีเมล** เป็นโดเมนจริง (เช่น `https://your-domain.vercel.app`) เพื่อให้ปุ่มในอีเมลและลิงก์ OAuth ทำงานได้อย่างถูกต้อง
+1. Push โค้ดขึ้น GitHub Repository บน branch `main`
+2. Import โปรเจกต์เข้าสู่ **Vercel** (เลือก Framework Preset: **SvelteKit**)
+3. กำหนด **Build Command** เป็น `bun run build` (หรือ `prisma generate && vite build`)
+4. ตั้งค่า **Environment Variables** ในการตั้งค่าโปรเจกต์บน Vercel (`DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_SECRET` ฯลฯ)
+5. ตรวจสอบให้แน่ใจว่า Production PostgreSQL รองรับการเชื่อมต่อจากภายนอก (`sslmode=require`)
+6. หลัง Deploy เสร็จสิ้น ให้เข้าสู่ระบบแอดมินไปที่ **Admin > Settings** แล้วระบุ **Base URL สำหรับลิงก์ในอีเมล** เป็นโดเมนจริง (เช่น `https://your-domain.vercel.app`) เพื่อให้ปุ่มในอีเมลและลิงก์ OAuth ทำงานได้อย่างถูกต้อง
 
 ---
 

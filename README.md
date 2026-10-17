@@ -3,15 +3,16 @@
 
 🌐 **Language / ภาษา:** **English** | [🇹🇭 ภาษาไทย](./TH/README.md)
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.3.7-black?style=flat&logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.3.0-blue?style=flat&logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-2.0+-FF3E00?style=flat&logo=svelte)](https://svelte.dev/)
+[![Svelte 5](https://img.shields.io/badge/Svelte-5.0+_(Runes)-FF3E00?style=flat&logo=svelte)](https://svelte.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0+-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.2+-fbf0df?style=flat&logo=bun)](https://bun.sh/)
 [![Prisma](https://img.shields.io/badge/Prisma-6.4+-2D3748?style=flat&logo=prisma)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-Private-orange.svg)]()
 
-A modern, production-ready full-stack meeting room reservation web application built for the KMUTNB Student Council. Powered by **Next.js 16 (App Router with Turbopack)**, **React 19**, **TypeScript**, **Tailwind CSS v4**, **Prisma ORM**, and **PostgreSQL**, with **Bun** as runtime and package manager.
+A high-performance, modern full-stack meeting room reservation web application built for the KMUTNB Student Council. Powered by **SvelteKit 2+**, **Svelte 5 (Runes)**, **Vite 8**, **TypeScript**, **Tailwind CSS v4**, **Prisma ORM**, and **PostgreSQL**, with **Bun** as runtime and package manager.
 
 ---
 
@@ -30,7 +31,7 @@ A modern, production-ready full-stack meeting room reservation web application b
 - **Instant Status Lookup:** Query booking status using Student ID or Tracking Code.
 - **Self-Service Cancellation:** Students can cancel bookings independently by verifying the last 4 digits of their phone number.
 - **1-Click Calendar Export:** Add reservations to Google Calendar directly or download standard RFC 5545 `.ics` files.
-- **QR Code Check-in:** Check in at the venue by scanning the room's QR code.
+- **QR Code Check-in:** Check in at the venue by scanning the room's QR code or manual input.
 
 ### 3. Advanced Admin Dashboard & Management (`/admin`)
 - **Switchable Views:** Seamlessly toggle between:
@@ -46,7 +47,7 @@ A modern, production-ready full-stack meeting room reservation web application b
 - **Invitation Flow:** Super Admins can invite new admins via email tokens to securely set up their passwords (`/admin/setup-password`).
 
 ### 4. Dynamic GitHub Releases Changelog (`/admin/changelog`)
-- **Dynamic Fetching:** Changelog data is fetched live from GitHub Releases API (`SC-KMUTNB/reservation`) with server-side ISR caching (1 hour) to keep the client bundle lightweight.
+- **Dynamic Fetching:** Changelog data is fetched live from GitHub Releases API (`SC-KMUTNB/reservation`) with server-side caching (1 hour) to keep the client bundle lightweight.
 - **Strict SemVer Classification:** Releases are categorized into **Major** (`vX.0.0`), **Minor** (`v1.X.0`), and **Patch** (`v1.X.Y`).
 - **Markdown Parser & Badges:** Automatically maps release notes into structured badges (✨ Features, 🐛 Bug Fixes, ⚡ Improvements, 🛡️ Security).
 - **Admin Force Refresh:** Includes a manual refresh button to bypass cache immediately after publishing.
@@ -63,7 +64,7 @@ A modern, production-ready full-stack meeting room reservation web application b
 - Quick filters: Custom date range, Current Month, Last Month, or Status.
 
 ### 7. Security Hardening
-- **Edge Middleware:** Protected `/admin/*` and `/m/admin/*` routes verified via JOSE JWT.
+- **SvelteKit Server Hooks (`hooks.server.ts`):** Protected `/admin/*` and `/m/admin/*` routes verified via JOSE JWT.
 - **IP Rate Limiting:** Sliding-window in-memory rate limiter protecting public endpoints against abuse.
 - **Timezone Validation:** Enforces strict timezone-aware validation preventing backdated bookings.
 - **Password Hashing:** Industry-standard bcrypt hashing for all credentials.
@@ -76,9 +77,10 @@ A modern, production-ready full-stack meeting room reservation web application b
 ## 💻 Tech Stack & Architecture
 
 - **Runtime & Package Manager:** [Bun](https://bun.sh) (v1.2+)
-- **Framework:** Next.js 16.3.7 (App Router with Turbopack)
+- **Framework:** SvelteKit 2+ / Vite 8+
+- **Reactive UI Library:** Svelte 5 (Runes: `$state`, `$derived`, `$effect`)
+- **Styling & Design:** Tailwind CSS v4 & Lucide Svelte
 - **Database:** PostgreSQL (via Prisma ORM 6.4+)
-- **Styling:** Tailwind CSS v4 & Lucide React
 - **Authentication:** JOSE JWT (HTTP-only cookies) & Bcrypt
 - **Reports:** ExcelJS
 - **Email:** Nodemailer with Google SMTP
@@ -124,7 +126,7 @@ Default credentials created:
 ```bash
 bun run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
@@ -132,11 +134,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Script | Command | Purpose |
 | :--- | :--- | :--- |
-| **Development** | `bun run dev` | Starts local Next.js dev server with Turbopack |
-| **Production Build** | `bun run build` | Generates Prisma client and builds Next.js application |
-| **Start Server** | `bun run start` | Starts Next.js production server |
-| **Run Tests** | `bun test` | Runs the Bun unit & integration test suite |
-| **Typecheck** | `bun run typecheck` | Checks TypeScript compilation (`tsc --noEmit`) |
+| **Development** | `bun run dev` | Starts local Vite dev server with SvelteKit |
+| **Production Build** | `bun run build` | Generates Prisma client and compiles SvelteKit application via Vite |
+| **Preview Build** | `bun run preview` | Previews the production build locally |
+| **Prepare** | `bun run prepare` | Synchronizes SvelteKit generated types (`svelte-kit sync`) |
+| **Run Tests** | `bun test` | Runs the Bun unit & integration test suite (84 tests) |
+| **Typecheck** | `bun run typecheck` | Syncs SvelteKit types and runs `svelte-check` |
 | **Lint** | `bun run lint` | Runs ESLint |
 | **Seed Database** | `bun run seed` | Seeds default admin accounts and site configuration |
 | **Schema Validation**| `bun run db:ensure` | Ensures required columns exist in Postgres |
@@ -163,11 +166,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🚀 Deployment to Vercel
 
-1. Push your repository to GitHub.
-2. Import the project into **Vercel**.
-3. Configure the **Environment Variables** in Vercel project settings (`DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_SECRET`, etc.).
-4. The build command `prisma generate && next build` will automatically run.
-5. In **Admin > Settings**, configure the **Base URL** (e.g. `https://your-domain.vercel.app`) so email deep links and OAuth redirects point to your production URL.
+1. Push your repository to GitHub `main` branch.
+2. Import the repository in **Vercel** (Preset: **SvelteKit**).
+3. Set **Build Command** to `bun run build` (or `prisma generate && vite build`).
+4. Configure the **Environment Variables** in Vercel project settings (`DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_SECRET`, SMTP credentials, etc.).
+5. Ensure your production PostgreSQL database is accessible from Vercel (`sslmode=require`).
+6. In **Admin > Settings**, configure the **Base URL** (e.g. `https://your-domain.vercel.app`) so email deep links and OAuth redirects point to your production URL.
 
 ---
 

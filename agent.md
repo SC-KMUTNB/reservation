@@ -16,39 +16,54 @@ All AI agents and developers working on this project MUST strictly adhere to thi
 
 | Component | Path | Variants / Props |
 | :--- | :--- | :--- |
-| **`Button`** | `@/components/ui/button.tsx` | `variant`: `"primary"` \| `"secondary"` \| `"success"` \| `"destructive"` \| `"outline"` \| `"ghost"`<br>`size`: `"sm"` \| `"default"` \| `"lg"` \| `"icon"` |
-| **`Badge`** | `@/components/ui/badge.tsx` | `status`: `"APPROVED"` \| `"PENDING"` \| `"REJECTED"` \| `"CANCELLED"` \| `"CHECKIN"` \| `"neutral"`<br>`size`: `"sm"` \| `"default"` \| `"lg"` |
-| **`Input`** | `@/components/ui/input.tsx` | `intent`: `"default"` \| `"error"` |
+| **`Button`** | `$lib/components/ui/Button.svelte` | `variant`: `"primary"` \| `"secondary"` \| `"success"` \| `"destructive"` \| `"outline"` \| `"ghost"`<br>`size`: `"sm"` \| `"default"` \| `"lg"` \| `"icon"` |
+| **`Badge`** | `$lib/components/ui/Badge.svelte` | `status`: `"APPROVED"` \| `"PENDING"` \| `"REJECTED"` \| `"CANCELLED"` \| `"CHECKIN"` \| `"neutral"`<br>`size`: `"sm"` \| `"default"` \| `"lg"` |
+| **`Input`** | `$lib/components/ui/Input.svelte` | `intent`: `"default"` \| `"error"` |
 
 ---
 
-## 3. CVA Standard Pattern Snippet
+## 3. Svelte 5 Runes Standard Pattern Snippet
 
-When authoring or extending primitives, use `cva` + `cn` (`clsx` + `twMerge`):
+When authoring or extending primitives in Svelte 5, use `cva` + `cn` (`clsx` + `tailwind-merge`):
 
-```tsx
-import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+```svelte
+<script lang="ts">
+  import { cva, type VariantProps } from 'class-variance-authority';
+  import { cn } from '$lib/utils';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
-const componentVariants = cva("base-styles", {
-  variants: {
-    variant: { default: "...", custom: "..." },
-    size: { sm: "...", default: "...", lg: "..." },
-  },
-  defaultVariants: { variant: "default", size: "default" },
-});
+  const buttonVariants = cva(
+    'inline-flex items-center justify-center font-medium transition active:scale-95 disabled:pointer-events-none',
+    {
+      variants: {
+        variant: {
+          primary: 'bg-orange-500 text-white hover:bg-orange-600',
+          secondary: 'bg-slate-800 text-slate-200 hover:bg-slate-700',
+        },
+        size: {
+          sm: 'h-8 px-3 text-xs rounded-lg',
+          default: 'h-10 px-4 text-sm rounded-xl',
+        }
+      },
+      defaultVariants: {
+        variant: 'primary',
+        size: 'default'
+      }
+    }
+  );
 
-export interface ComponentProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof componentVariants> {}
+  let {
+    variant,
+    size,
+    class: className,
+    children,
+    ...restProps
+  }: HTMLButtonAttributes & VariantProps<typeof buttonVariants> = $props();
+</script>
 
-export const Component = React.forwardRef<HTMLDivElement, ComponentProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <div ref={ref} className={cn(componentVariants({ variant, size, className }))} {...props} />
-  )
-);
-Component.displayName = "Component";
+<button class={cn(buttonVariants({ variant, size, className }))} {...restProps}>
+  {@render children?.()}
+</button>
 ```
 
 ---

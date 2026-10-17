@@ -30,26 +30,25 @@ The KMUTNB Meeting Room Reservation System (ระบบจองห้องป
 │   ├── ensure-db-schema.ts        # Database schema validator
 │   └── test-db.ts                 # Database integration tester
 ├── src/
-│   ├── app/
-│   │   ├── (public)/              # Public user routes: booking, tracking, status
-│   │   │   ├── booking/           # Public room booking with availability heatmap
-│   │   │   └── track/             # Student booking tracker & self-service cancellation
-│   │   ├── admin/                 # Desktop Admin panel
-│   │   │   ├── changelog/         # Dynamic changelog synced with GitHub Releases
-│   │   │   ├── dashboard/         # Multi-view (Table/Timeline/Calendar) + Batch Actions
-│   │   │   ├── reports/           # Executive multi-sheet Excel export (.xlsx)
-│   │   │   ├── settings/          # Dynamic facility & site configuration
-│   │   │   └── users/             # RBAC admin management & invite flow
-│   │   ├── m/                     # Mobile-optimized application suite (/m/*)
-│   │   └── api/                   # Next.js Server Route Handlers
-│   │       ├── changelog/         # GitHub Releases fetcher with ISR caching
-│   │       └── ...
+│   ├── app.html                   # HTML page template
+│   ├── app.d.ts                   # SvelteKit global declarations
+│   ├── hooks.server.ts            # Server request authentication & protection
 │   ├── lib/
+│   │   ├── auth.ts                # JWT session signing and cookie management
 │   │   ├── changelog.ts           # SemVer classification & release markdown parser
 │   │   ├── date-utils.ts          # Thai BE (พ.ศ.) date/time & timezone utilities
 │   │   ├── facility-config.ts     # Room config, operational slots, equipment list
-│   │   └── rate-limit.ts          # Sliding-window IP rate limiter
-│   └── middleware.ts              # Edge JWT authentication & route protector
+│   │   ├── rate-limit.ts          # Sliding-window IP rate limiter
+│   │   ├── prisma.ts              # Prisma database client
+│   │   └── components/            # Reusable Svelte 5 UI components (UI primitives, modals)
+│   └── routes/                    # SvelteKit filesystem routes
+│       ├── +layout.svelte         # Root application layout
+│       ├── +page.svelte           # Landing page
+│       ├── booking/               # Public booking with availability heatmap
+│       ├── track/                 # Student booking tracker & cancellation
+│       ├── admin/                 # Desktop Admin panel (+layout.svelte and pages)
+│       ├── m/                     # Mobile-optimized application suite (/m/*)
+│       └── api/                   # SvelteKit API Server endpoints (+server.ts)
 └── tests/                         # Bun test suite (Unit & Integration tests)
 ```
 
