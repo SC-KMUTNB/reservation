@@ -9,13 +9,13 @@
 The KMUTNB Meeting Room Reservation System (ระบบจองห้องประชุมสภานักศึกษา มจพ.) is a production-grade full-stack web application designed for university students and administrators.
 
 ### Core Technologies
-- **Framework:** Next.js 16.3+ (App Router, Turbopack)
-- **UI Library:** React 19.3+, Lucide React icons
-- **Styling:** Tailwind CSS v4 (PostCSS integration)
+- **Framework:** SvelteKit 2+ / Vite 8+
+- **UI Library:** Svelte 5 (Runes), Lucide Svelte icons
+- **Styling:** Tailwind CSS v4 (Vite plugin `@tailwindcss/vite`)
 - **Runtime & Package Manager:** [Bun](https://bun.sh) (v1.2+)
 - **ORM & Database:** Prisma ORM 6.4+ with PostgreSQL
 - **Authentication:** HTTP-only JWT sessions signed via `jose`, bcrypt password hashing, optional Google OAuth 2.0
-- **Security:** Edge Middleware protection, sliding-window in-memory IP rate limiter, non-blocking side effects via `after()` from `next/server`
+- **Security:** SvelteKit hooks (`hooks.server.ts`), sliding-window in-memory IP rate limiter
 
 ---
 
