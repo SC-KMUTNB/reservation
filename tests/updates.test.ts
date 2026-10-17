@@ -4,11 +4,10 @@ import {
   normalizeCategory,
   parseGitHubRelease,
   formatUpdateToMarkdown,
-  GitHubRelease,
-  UpdateRecord,
-} from '@/lib/changelog';
-import { GET as getChangelog } from '@/app/api/changelog/route';
-import { NextRequest } from 'next/server';
+  type GitHubRelease,
+  type UpdateRecord,
+} from '$lib/changelog';
+import { GET as getChangelog } from '../src/routes/api/changelog/+server';
 
 describe('SemVer Classification (classifyVersion)', () => {
   test('classifies major versions correctly', () => {
@@ -119,8 +118,11 @@ describe('parseGitHubRelease and formatUpdateToMarkdown', () => {
 
 describe('GET /api/changelog route handler', () => {
   test('returns 200 and a list of updates from GitHub Releases API', async () => {
-    const req = new NextRequest('http://localhost:3000/api/changelog');
-    const response = await getChangelog(req);
+    const event = {
+      url: new URL('http://localhost:3000/api/changelog'),
+      request: new Request('http://localhost:3000/api/changelog'),
+    } as any;
+    const response = await getChangelog(event);
 
     expect(response.status).toBe(200);
     const body = await response.json();

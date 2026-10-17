@@ -4,9 +4,9 @@ import {
   isSlotBooked,
   isSlotAvailable,
   getValidEndTimes,
-  TimeSlot,
-} from '@/components/booking/TimeSlotPicker';
-import { BookingItem } from '@/types/booking';
+  type TimeSlot,
+} from '$lib/time-slot-utils';
+import type { BookingItem } from '$lib/types/booking';
 
 describe('TimeSlotPicker Multi-Hour and Conflict Logic', () => {
   const dummySlots: TimeSlot[] = [

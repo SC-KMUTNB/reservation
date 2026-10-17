@@ -1,6 +1,4 @@
-import { NextResponse } from 'next/server';
-
-interface RateLimitResult {
+export interface RateLimitResult {
   allowed: boolean;
   limit: number;
   remaining: number;
@@ -96,8 +94,8 @@ export function resetRateLimits(): void {
   limiter.reset();
 }
 
-export function rateLimitResponse(result: RateLimitResult): NextResponse {
-  return NextResponse.json(
+export function rateLimitResponse(result: RateLimitResult): Response {
+  return Response.json(
     { error: 'คำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง' },
     {
       status: 429,

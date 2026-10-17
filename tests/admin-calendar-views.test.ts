@@ -5,7 +5,7 @@ import {
   getWeekDates,
   assignLanes,
   type AdminBooking,
-} from '../src/components/admin/AdminScheduleTimeline';
+} from '../src/lib/timeline-utils';
 
 describe('Admin Schedule Timeline Logic', () => {
   it('parseTimeToMinutes converts HH:mm string to minutes from midnight', () => {

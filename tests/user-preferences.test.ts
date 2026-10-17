@@ -8,11 +8,28 @@ import {
   mergeUserPreferences,
   type UserDashboardPreferences,
 } from '../src/lib/user-preferences';
-import { GET, PATCH } from '../src/app/api/users/preferences/route';
-import { GET as getAuthMe } from '../src/app/api/auth/me/route';
-import { NextRequest } from 'next/server';
+import { GET, PATCH } from '../src/routes/api/users/preferences/+server';
+import { GET as getAuthMe } from '../src/routes/api/auth/me/+server';
 import * as authModule from '../src/lib/auth';
 import { prisma } from '../src/lib/prisma';
+
+function createMockEvent(url: string, method: string = 'GET', bodyObj?: any) {
+  const request = new Request(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: bodyObj !== undefined ? JSON.stringify(bodyObj) : undefined,
+  });
+  return {
+    request,
+    url: new URL(url),
+    cookies: {
+      get: () => undefined,
+      set: () => {},
+      delete: () => {},
+    },
+    locals: {},
+  } as any;
+}
 
 describe('User Preferences Schema & Defaults', () => {
   it('should return complete default preferences when given undefined or empty object', () => {
@@ -80,8 +97,8 @@ describe('User Preferences API Routes', () => {
   it('GET /api/users/preferences returns 401 when unauthenticated', async () => {
     spyOn(authModule, 'getSessionFromRequest').mockResolvedValue(null);
 
-    const req = new NextRequest('http://localhost:3000/api/users/preferences');
-    const res = await GET(req);
+    const event = createMockEvent('http://localhost:3000/api/users/preferences', 'GET');
+    const res = await GET(event);
     expect(res.status).toBe(401);
 
     const data = await res.json();
@@ -91,11 +108,8 @@ describe('User Preferences API Routes', () => {
   it('PATCH /api/users/preferences returns 401 when unauthenticated', async () => {
     spyOn(authModule, 'getSessionFromRequest').mockResolvedValue(null);
 
-    const req = new NextRequest('http://localhost:3000/api/users/preferences', {
-      method: 'PATCH',
-      body: JSON.stringify({ defaultView: 'MONTH' }),
-    });
-    const res = await PATCH(req);
+    const event = createMockEvent('http://localhost:3000/api/users/preferences', 'PATCH', { defaultView: 'MONTH' });
+    const res = await PATCH(event);
     expect(res.status).toBe(401);
 
     const data = await res.json();
@@ -119,8 +133,8 @@ describe('User Preferences API Routes', () => {
       }),
     };
 
-    const req = new NextRequest('http://localhost:3000/api/users/preferences');
-    const res = await GET(req);
+    const event = createMockEvent('http://localhost:3000/api/users/preferences', 'GET');
+    const res = await GET(event);
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -156,15 +170,12 @@ describe('User Preferences API Routes', () => {
       },
     };
 
-    const req = new NextRequest('http://localhost:3000/api/users/preferences', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        defaultView: 'MONTH',
-        visibleColumns: { department: false },
-      }),
+    const event = createMockEvent('http://localhost:3000/api/users/preferences', 'PATCH', {
+      defaultView: 'MONTH',
+      visibleColumns: { department: false },
     });
 
-    const res = await PATCH(req);
+    const res = await PATCH(event);
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -200,8 +211,8 @@ describe('User Preferences API Routes', () => {
       }),
     };
 
-    const req = new NextRequest('http://localhost:3000/api/auth/me');
-    const res = await getAuthMe(req);
+    const event = createMockEvent('http://localhost:3000/api/auth/me', 'GET');
+    const res = await getAuthMe(event);
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -245,8 +256,8 @@ describe('User Preferences API Routes', () => {
       },
     };
 
-    const req = new NextRequest('http://localhost:3000/api/auth/me');
-    const res = await getAuthMe(req);
+    const event = createMockEvent('http://localhost:3000/api/auth/me', 'GET');
+    const res = await getAuthMe(event);
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -271,8 +282,8 @@ describe('User Preferences API Routes', () => {
       },
     };
 
-    const req = new NextRequest('http://localhost:3000/api/users/preferences');
-    const res = await GET(req);
+    const event = createMockEvent('http://localhost:3000/api/users/preferences', 'GET');
+    const res = await GET(event);
     expect(res.status).toBe(200);
 
     const data = await res.json();

@@ -7,13 +7,30 @@ import {
   validateBatchApproval,
   type CandidateBooking,
 } from '../src/lib/batch-validation';
-import { POST } from '../src/app/api/admin/bookings/batch/route';
-import { NextRequest } from 'next/server';
+import { POST } from '../src/routes/api/admin/bookings/batch/+server';
 import * as authModule from '../src/lib/auth';
 import * as auditModule from '../src/lib/audit';
 import * as emailModule from '../src/lib/email';
 import * as sheetsModule from '../src/lib/google-sheets';
 import { prisma } from '../src/lib/prisma';
+
+function createMockEvent(url: string, bodyObj?: any) {
+  const request = new Request(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: bodyObj !== undefined ? JSON.stringify(bodyObj) : undefined,
+  });
+  return {
+    request,
+    url: new URL(url),
+    cookies: {
+      get: () => undefined,
+      set: () => {},
+      delete: () => {},
+    },
+    locals: {},
+  } as any;
+}
 
 describe('validateBatchApproval', () => {
   it('should detect candidate overlapping with existing approved booking as conflict', () => {
@@ -124,12 +141,12 @@ describe('POST /api/admin/bookings/batch API Route', () => {
   it('returns 401 when unauthenticated', async () => {
     spyOn(authModule, 'getSessionFromRequest').mockResolvedValue(null);
 
-    const req = new NextRequest('http://localhost:3000/api/admin/bookings/batch', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'APPROVE', bookingIds: ['id-1'] }),
+    const event = createMockEvent('http://localhost:3000/api/admin/bookings/batch', {
+      action: 'APPROVE',
+      bookingIds: ['id-1'],
     });
 
-    const res = await POST(req);
+    const res = await POST(event);
     expect(res.status).toBe(401);
     const data = await res.json();
     expect(data.error).toContain('ไม่ได้รับอนุญาต');
@@ -143,12 +160,12 @@ describe('POST /api/admin/bookings/batch API Route', () => {
       role: 'ADMIN',
     });
 
-    const req = new NextRequest('http://localhost:3000/api/admin/bookings/batch', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'INVALID_ACTION', bookingIds: ['id-1'] }),
+    const event = createMockEvent('http://localhost:3000/api/admin/bookings/batch', {
+      action: 'INVALID_ACTION',
+      bookingIds: ['id-1'],
     });
 
-    const res = await POST(req);
+    const res = await POST(event);
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBeDefined();
@@ -162,12 +179,12 @@ describe('POST /api/admin/bookings/batch API Route', () => {
       role: 'ADMIN',
     });
 
-    const req = new NextRequest('http://localhost:3000/api/admin/bookings/batch', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'APPROVE', bookingIds: [] }),
+    const event = createMockEvent('http://localhost:3000/api/admin/bookings/batch', {
+      action: 'APPROVE',
+      bookingIds: [],
     });
 
-    const res = await POST(req);
+    const res = await POST(event);
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBeDefined();
@@ -228,12 +245,12 @@ describe('POST /api/admin/bookings/batch API Route', () => {
     };
     (prisma as any).$transaction = async (promises: any[]) => promises;
 
-    const req = new NextRequest('http://localhost:3000/api/admin/bookings/batch', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'APPROVE', bookingIds: ['b-1', 'b-2'] }),
+    const event = createMockEvent('http://localhost:3000/api/admin/bookings/batch', {
+      action: 'APPROVE',
+      bookingIds: ['b-1', 'b-2'],
     });
 
-    const res = await POST(req);
+    const res = await POST(event);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.success).toBe(true);
@@ -294,16 +311,13 @@ describe('POST /api/admin/bookings/batch API Route', () => {
     };
     (prisma as any).$transaction = async (promises: any[]) => promises;
 
-    const req = new NextRequest('http://localhost:3000/api/admin/bookings/batch', {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'REJECT',
-        bookingIds: ['b-1', 'b-2'],
-        rejectionReason: 'ห้องปิดปรับปรุงระบบไฟฟ้า',
-      }),
+    const event = createMockEvent('http://localhost:3000/api/admin/bookings/batch', {
+      action: 'REJECT',
+      bookingIds: ['b-1', 'b-2'],
+      rejectionReason: 'ห้องปิดปรับปรุงระบบไฟฟ้า',
     });
 
-    const res = await POST(req);
+    const res = await POST(event);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.success).toBe(true);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { extractBookingCode } from '@/components/admin/QrScannerModal';
+import { extractBookingCode } from '$lib/qr-scanner';
 
 describe('extractBookingCode', () => {
   it('extracts raw booking code correctly', () => {

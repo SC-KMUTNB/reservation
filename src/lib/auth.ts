@@ -1,6 +1,4 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
-import { NextRequest } from 'next/server';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -48,15 +46,23 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
   }
 }
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
+
+
+export async function getSessionFromRequest(
+  requestOrEvent: any
+): Promise<SessionUser | null> {
+  let token: string | undefined;
+
+  if (requestOrEvent?.cookies?.get) {
+    const c = requestOrEvent.cookies.get('admin_token');
+    token = typeof c === 'string' ? c : c?.value;
+  } else if (requestOrEvent?.headers?.get) {
+    const cookieHeader = requestOrEvent.headers.get('cookie') || '';
+    const match = cookieHeader.match(/admin_token=([^;]+)/);
+    token = match ? decodeURIComponent(match[1]) : undefined;
+  }
+
   if (!token) return null;
   return await verifySessionToken(token);
 }
 
-export async function getSessionFromRequest(request: NextRequest): Promise<SessionUser | null> {
-  const token = request.cookies.get('admin_token')?.value;
-  if (!token) return null;
-  return await verifySessionToken(token);
-}
