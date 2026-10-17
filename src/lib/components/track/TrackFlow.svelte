@@ -27,6 +27,7 @@
   import { buildGoogleCalendarUrl, generateIcsContent } from '$lib/calendar-export';
   import Button from '$lib/components/ui/Button.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
+  import AppHeader from '$lib/components/ui/AppHeader.svelte';
 
   interface BookingTrackItem {
     id: string;
@@ -223,38 +224,7 @@
 </script>
 
 <div class="min-h-dvh bg-slate-50 flex flex-col text-slate-800">
-  <!-- Sticky Header -->
-  <header class="sticky top-0 z-40 bg-orange-600/95 backdrop-blur-md border-b border-orange-500/40 text-white shadow-warm-xs">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-      <a href="/" class="flex items-center space-x-3 group">
-        <div class="bg-white text-orange-600 p-2 rounded-2xl font-bold w-10 h-10 flex items-center justify-center shadow-warm-xs group-hover:scale-105 transition-transform">
-          <Landmark class="w-5 h-5 stroke-[2.2]" />
-        </div>
-        <div>
-          <h1 class="font-bold text-base leading-tight tracking-tight text-white drop-shadow-2xs">
-            สภานักศึกษา มจพ.
-          </h1>
-          <p class="text-[11px] text-orange-100 font-medium tracking-wide">
-            Student Council KMUTNB
-          </p>
-        </div>
-      </a>
-      <div class="flex items-center gap-2">
-        <a
-          href="/booking"
-          class="text-xs font-semibold bg-white text-orange-600 hover:bg-orange-50 px-3.5 py-2 rounded-xl transition active-press flex items-center gap-1.5 shadow-warm-xs"
-        >
-          <Calendar class="w-3.5 h-3.5" /> จองห้องประชุม
-        </a>
-        <a
-          href="/"
-          class="text-xs font-medium bg-orange-950/30 hover:bg-orange-950/50 px-3.5 py-2 rounded-xl transition active-press flex items-center gap-1.5 border border-orange-400/30 text-white"
-        >
-          <ArrowLeft class="w-3.5 h-3.5" /> หน้าหลัก
-        </a>
-      </div>
-    </div>
-  </header>
+  <AppHeader activeTab="track" />
 
   <!-- Subheader Banner -->
   <section class="bg-gradient-to-b from-orange-600 to-amber-600 text-white py-12 px-4 relative overflow-hidden">

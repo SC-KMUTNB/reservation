@@ -17,6 +17,7 @@
 		Wifi
 	} from 'lucide-svelte';
 	import ViewSwitcherFooter from '$lib/components/mobile/ViewSwitcherFooter.svelte';
+	import AppHeader from '$lib/components/ui/AppHeader.svelte';
 
 	let settings = $state<Record<string, string>>({});
 	let quickSearchQuery = $state('');
@@ -50,65 +51,11 @@
 </svelte:head>
 
 <div class="min-h-dvh flex flex-col bg-slate-50 text-slate-800">
-	<!-- Sticky Header with Frosted Glass Effect -->
-	<header class="sticky top-0 z-40 bg-orange-600/95 backdrop-blur-md border-b border-orange-500/40 text-white shadow-warm-xs">
-		<div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-			<a href="/" class="flex items-center space-x-3 group">
-				<div class="bg-white text-orange-600 p-2 rounded-2xl font-bold w-10 h-10 flex items-center justify-center shadow-warm-xs group-hover:scale-105 transition-transform duration-200">
-					<Landmark class="w-5 h-5 stroke-[2.2]" />
-				</div>
-				<div>
-					<h1 class="font-bold text-base leading-tight tracking-tight text-white drop-shadow-2xs">
-						{settings.site_title || 'สภานักศึกษา มจพ.'}
-					</h1>
-					<p class="text-[11px] text-orange-100 font-medium tracking-wide">
-						{settings.site_subtitle || 'Student Council KMUTNB'}
-					</p>
-				</div>
-			</a>
-
-			<nav class="hidden md:flex items-center space-x-1 text-sm font-medium">
-				<a
-					href="/"
-					class="px-3 py-1.5 rounded-xl bg-orange-700/60 text-white font-semibold shadow-inner border border-orange-400/30"
-				>
-					หน้าหลัก
-				</a>
-				<a
-					href="/booking"
-					class="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition flex items-center gap-1.5"
-				>
-					<CalendarIcon class="w-4 h-4 stroke-[2]" /> จองห้องประชุม
-				</a>
-				<a
-					href="/track"
-					class="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition flex items-center gap-1.5"
-				>
-					<Search class="w-4 h-4 stroke-[2]" /> ตรวจสอบสถานะ
-				</a>
-				<a
-					href="#channels"
-					class="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition"
-				>
-					ช่องทางติดต่อ
-				</a>
-				<a
-					href="#complaint"
-					class="px-3 py-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-orange-500/40 transition"
-				>
-					เรื่องร้องเรียน
-				</a>
-				<div class="pl-2">
-					<a
-						href="/admin/login"
-						class="bg-orange-950/40 hover:bg-orange-950/60 text-orange-100 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold border border-orange-400/30 shadow-xs transition active-press flex items-center gap-1.5"
-					>
-						<Lock class="w-3.5 h-3.5" /> แอดมิน
-					</a>
-				</div>
-			</nav>
-		</div>
-	</header>
+	<AppHeader
+		siteTitle={settings.site_title}
+		siteSubtitle={settings.site_subtitle}
+		activeTab="home"
+	/>
 
 	<!-- Hero Section -->
 	<section class="relative overflow-hidden bg-gradient-to-b from-orange-600 via-orange-600 to-amber-600 text-white pt-16 pb-20 px-4">
