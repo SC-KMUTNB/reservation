@@ -61,5 +61,5 @@ export async function GET(event: RequestEvent) {
 	googleAuthUrl.searchParams.set('prompt', 'select_account');
 	googleAuthUrl.searchParams.set('hd', 'email.kmutnb.ac.th');
 
-	throw redirect(303, googleAuthUrl.toString());
+	throw redirect(303, googleAuthUrl.toString(), { external: true });
 }
