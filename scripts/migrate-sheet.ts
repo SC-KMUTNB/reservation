@@ -39,12 +39,22 @@ async function promptMode(): Promise<MigrationMode> {
 
 async function run() {
   try {
+    const args = process.argv.slice(2);
+    const fileArg = args.find((a) => a.startsWith('--file='));
+    const customFilePath = fileArg ? fileArg.split('=')[1]?.trim() : undefined;
+
+    if (!customFilePath) {
+      console.error('\n❌ กรุณาระบุไฟล์ Excel ที่ต้องการนำเข้าผ่านพารามิเตอร์ --file=<path>');
+      console.log('ตัวอย่างการใช้งาน: bun run migrate:sheet --file=./path/to/spreadsheet.xlsx [--mode=overwrite|add]\n');
+      process.exit(1);
+    }
+
     const mode = await promptMode();
 
-    console.log(`\n🚀 เริ่มต้นการนำเข้าข้อมูลประวัติการจองจากโฟลเดอร์ sheetexample (โหมด: ${mode.toUpperCase()})...`);
+    console.log(`\n🚀 เริ่มต้นการนำเข้าข้อมูลประวัติการจองจาก ${customFilePath} (โหมด: ${mode.toUpperCase()})...`);
 
     const startTime = Date.now();
-    const result = await migrateSheetHistory({ mode });
+    const result = await migrateSheetHistory({ customFilePath, mode });
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
     console.log('\n✅ การนำเข้าข้อมูลเสร็จสมบูรณ์!');

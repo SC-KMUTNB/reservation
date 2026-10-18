@@ -17,7 +17,7 @@ export async function POST(event: RequestEvent) {
 		let mode: MigrationMode = 'overwrite';
 		let defaultStatus: BookingStatus = BookingStatus.PENDING;
 		let buffer: Buffer | undefined;
-		let fileName = 'sheetexample (ไฟล์เริ่มต้นในระบบ)';
+		let fileName = 'uploaded.xlsx';
 
 		const contentType = event.request.headers.get('content-type') || '';
 		if (contentType.includes('multipart/form-data')) {
@@ -45,6 +45,13 @@ export async function POST(event: RequestEvent) {
 			if (['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(rawDefaultStatus)) {
 				defaultStatus = rawDefaultStatus as BookingStatus;
 			}
+		}
+
+		if (!buffer) {
+			return json(
+				{ error: 'กรุณาอัปโหลดไฟล์ Microsoft Excel (.xlsx / .xls) เพื่อนำเข้าข้อมูล' },
+				{ status: 400 }
+			);
 		}
 
 		const result = await migrateSheetHistory({

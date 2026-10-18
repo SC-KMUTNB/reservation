@@ -235,7 +235,7 @@ export async function migrateSheetHistory(options?: MigrationOptions): Promise<M
 
   const result: MigrationResult = {
     mode,
-    source: options?.fileName || (options?.customFilePath ? path.basename(options.customFilePath) : 'sheetexample (ไฟล์เซิร์ฟเวอร์)'),
+    source: options?.fileName || (options?.customFilePath ? path.basename(options.customFilePath) : 'ไฟล์อัปโหลด'),
     totalRows: 0,
     imported: 0,
     updated: 0,
@@ -255,19 +255,13 @@ export async function migrateSheetHistory(options?: MigrationOptions): Promise<M
   if (options?.buffer) {
     const rawBuffer = Buffer.isBuffer(options.buffer) ? options.buffer : Buffer.from(options.buffer);
     await workbook.xlsx.load(rawBuffer as any);
-  } else {
-    const defaultPath = path.join(
-      process.cwd(),
-      'sheetexample',
-      'ฟอร์มสำหรับจองห้องประชุมสภานักศึกษา (การตอบกลับ).xlsx'
-    );
-    const targetPath = options?.customFilePath || defaultPath;
-
-    if (!fs.existsSync(/*turbopackIgnore: true*/ targetPath)) {
-      throw new Error(`ไม่พบไฟล์ข้อมูลประวัติที่พาธ: ${targetPath}`);
+  } else if (options?.customFilePath) {
+    if (!fs.existsSync(/*turbopackIgnore: true*/ options.customFilePath)) {
+      throw new Error(`ไม่พบไฟล์ข้อมูลประวัติที่พาธ: ${options.customFilePath}`);
     }
-
-    await workbook.xlsx.readFile(targetPath);
+    await workbook.xlsx.readFile(options.customFilePath);
+  } else {
+    throw new Error('กรุณาระบุไฟล์ Excel หรือ buffer สำหรับการประมวลผล');
   }
 
   const sheet = workbook.getWorksheet(1);

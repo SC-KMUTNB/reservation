@@ -373,19 +373,25 @@
 							</span>
 						</div>
 						<p class="text-[11px] text-slate-500 mt-0.5">
-							เลือกไฟล์ Excel (.xlsx / .xls) จากอุปกรณ์ของคุณ หรือใช้ไฟล์เริ่มต้นในระบบเพื่อนำเข้าประวัติการจองห้องประชุมเก่า
+							อัปโหลดไฟล์ Excel (.xlsx / .xls) จากอุปกรณ์ของคุณเพื่อนำเข้าหรือปรับปรุงประวัติการจองห้องประชุม
 						</p>
 					</div>
 				</div>
 
 				<button
 					type="button"
-					onclick={() => (isImportModalOpen = true)}
+					onclick={() => {
+						if (!selectedFile) {
+							fileInputRef?.click();
+						} else {
+							isImportModalOpen = true;
+						}
+					}}
 					disabled={isMigrating}
 					class="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-warm-xs transition flex items-center justify-center gap-2 active-press cursor-pointer disabled:opacity-50 shrink-0"
 				>
 					<RefreshCw class={`w-4 h-4 ${isMigrating ? 'animate-spin' : ''}`} />
-					<span>{isMigrating ? 'กำลังประมวลผลข้อมูลชีต...' : 'นำเข้าข้อมูลประวัติ (Import)'}</span>
+					<span>{isMigrating ? 'กำลังประมวลผลข้อมูลชีต...' : selectedFile ? 'นำเข้าข้อมูลประวัติ (Import)' : 'เลือกไฟล์ Excel เพื่อนำเข้า'}</span>
 				</button>
 			</div>
 
@@ -478,7 +484,7 @@
 							คลิกเพื่อเลือกไฟล์ Excel จากเครื่อง หรือลากไฟล์มาวางที่นี่ (.xlsx, .xls)
 						</div>
 						<div class="text-[11px] text-slate-500 font-light max-w-md">
-							หากไม่ได้เลือกไฟล์ ระบบจะใช้นำเข้าจากไฟล์เริ่มต้นของระบบ (<code class="text-orange-600 font-mono">sheetexample/*.xlsx</code>)
+							รองรับไฟล์แบบฟอร์มการจองห้องประชุมเดิม (.xlsx / .xls) โดยระบบจะตรวจจับคอลัมน์และประมวลผลอัตโนมัติ
 						</div>
 					</div>
 				{/if}
@@ -688,21 +694,17 @@
 				<div class="overflow-y-auto flex-1 pr-1 -mr-1 space-y-5 pt-4">
 					<div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3">
 						<div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-							{#if selectedFile}
-								<FileSpreadsheet class="w-5 h-5 text-emerald-600" />
-							{:else}
-								<FileText class="w-5 h-5 text-orange-600" />
-							{/if}
+							<FileSpreadsheet class="w-5 h-5 text-emerald-600" />
 						</div>
 						<div class="min-w-0 flex-1">
 							<div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-								แหล่งไฟล์ที่ใช้ประมวลผล:
+								ไฟล์ที่เลือกสำหรับประมวลผล:
 							</div>
 							<div class="text-xs font-extrabold text-slate-900 truncate">
-								{selectedFile ? selectedFile.name : 'sheetexample/ฟอร์มสำหรับจองห้องประชุมสภานักศึกษา (การตอบกลับ).xlsx'}
+								{selectedFile ? selectedFile.name : 'ยังไม่ได้เลือกไฟล์'}
 							</div>
 							<div class="text-[10px] text-slate-500">
-								{selectedFile ? `ไฟล์จากเครื่อง (${formatFileSize(selectedFile.size)})` : 'ไฟล์เริ่มต้นบนเซิร์ฟเวอร์'}
+								{selectedFile ? `ขนาด: ${formatFileSize(selectedFile.size)}` : 'กรุณาเลือกไฟล์ Excel (.xlsx, .xls)'}
 							</div>
 						</div>
 					</div>
