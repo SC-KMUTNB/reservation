@@ -746,7 +746,7 @@
           </div>
           <div class="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
             <Lock class="w-3 h-3 text-emerald-600" />
-            <span>AES-256-GCM Encrypted at Rest</span>
+            <span>Secure</span>
           </div>
         </div>
 
@@ -951,7 +951,7 @@
           </div>
           <div class="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
             <Lock class="w-3 h-3 text-emerald-600" />
-            <span>AES-256-GCM Encrypted at Rest</span>
+            <span>Secure</span>
           </div>
         </div>
 
@@ -1087,7 +1087,7 @@
           </div>
           <div class="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
             <Lock class="w-3 h-3 text-emerald-600" />
-            <span>AES-256-GCM Encrypted at Rest</span>
+            <span>Secure</span>
           </div>
         </div>
 
@@ -1199,6 +1199,7 @@
               id="gsheet-sa-key"
               rows={3}
               bind:value={settings.google_private_key}
+              style={showGoogleKey ? '' : '-webkit-text-security: disc; text-security: disc;'}
               placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;••••••••••••••••&#10;-----END RSA PRIVATE KEY-----"
               class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 font-mono text-[11px]"
             ></textarea>

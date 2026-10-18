@@ -4,7 +4,7 @@ import { getSessionFromRequest } from '$lib/auth';
 import { recordAuditLog } from '$lib/audit';
 import {
 	encryptSecret,
-	maskSecret,
+	decryptSecret,
 	SENSITIVE_SETTING_KEYS
 } from '$lib/encryption';
 import { getFacilityConfig, saveFacilityConfig } from '$lib/facility-config';
@@ -29,7 +29,7 @@ export async function GET(event: RequestEvent) {
 			}
 			if (SENSITIVE_SETTING_KEYS.includes(s.key)) {
 				if (isSuperAdmin) {
-					settingsMap[s.key] = s.value ? maskSecret(s.value) : '';
+					settingsMap[s.key] = s.value ? decryptSecret(s.value) : '';
 				}
 			} else {
 				settingsMap[s.key] = s.value;

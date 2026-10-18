@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import type { BackupData } from './backup';
+import { decryptBackupPayload } from './encryption';
 
 export type RestoreMode = 'merge' | 'replace';
 
@@ -25,9 +26,11 @@ export function validateBackupPayload(data: any): data is BackupData {
  * Restores database from a BackupData snapshot
  */
 export async function restoreDatabase(
-  backup: BackupData,
+  rawBackup: unknown,
   mode: RestoreMode = 'merge'
 ): Promise<RestoreResult> {
+  const backup = decryptBackupPayload<BackupData>(rawBackup);
+
   if (!validateBackupPayload(backup)) {
     throw new Error('โครงสร้างไฟล์สำรองข้อมูลไม่ถูกต้อง (Invalid backup JSON structure)');
   }

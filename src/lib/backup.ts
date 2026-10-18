@@ -1,5 +1,6 @@
 import { put, list, del } from '@vercel/blob';
 import { prisma } from './prisma';
+import { encryptBackupPayload } from './encryption';
 
 export interface BackupMetadata {
   version: string;
@@ -87,7 +88,9 @@ export async function createDatabaseBackup(triggerType: 'CRON' | 'MANUAL' = 'MAN
     auditLogs,
   };
 
-  const jsonContent = JSON.stringify(backupPayload, null, 2);
+  // Encrypt payload using AES-256-GCM with ENCRYPTION_SECRET
+  const encryptedEnvelope = encryptBackupPayload(backupPayload);
+  const jsonContent = JSON.stringify(encryptedEnvelope, null, 2);
   const fileName = `backups/db-backup-${triggerType.toLowerCase()}-${dateStr}.json`;
 
   // 2. Upload to Vercel Blob (Private store mode)

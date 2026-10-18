@@ -46,8 +46,11 @@ export function encryptSecret(plainText: string): string {
  * Decrypt a ciphertext string if it starts with the enc:v1: prefix.
  * If not encrypted or fails, handles gracefully.
  */
-export function decryptSecret(cipherString: string): string {
-  if (!cipherString || !cipherString.startsWith(PREFIX)) {
+export function decryptSecret(cipherString?: string | null): string {
+  if (!cipherString) {
+    return '';
+  }
+  if (!cipherString.startsWith(PREFIX)) {
     return cipherString;
   }
 
@@ -98,3 +101,83 @@ export const SENSITIVE_SETTING_KEYS = [
   'webhook_line_token',
   'webhook_line_target_id',
 ];
+
+export interface EncryptedBackupEnvelope {
+  encrypted: true;
+  version: string;
+  algorithm: string;
+  iv: string;
+  tag: string;
+  data: string;
+}
+
+/**
+ * Encrypt arbitrary JSON object using AES-256-GCM.
+ */
+export function encryptBackupPayload<T = any>(payload: T): EncryptedBackupEnvelope {
+  const encSecret = process.env.ENCRYPTION_SECRET;
+  if (!isTest && (!encSecret || encSecret.length < 32)) {
+    throw new Error(
+      'SECURITY ERROR: ENCRYPTION_SECRET is missing or shorter than 32 characters. Cannot encrypt backup.'
+    );
+  }
+
+  const plainText = JSON.stringify(payload);
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, getEncryptionKey(), iv);
+
+  let encrypted = cipher.update(plainText, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  const authTag = cipher.getAuthTag().toString('hex');
+
+  return {
+    encrypted: true,
+    version: '1.0',
+    algorithm: ALGORITHM,
+    iv: iv.toString('hex'),
+    tag: authTag,
+    data: encrypted,
+  };
+}
+
+/**
+ * Decrypt backup envelope or return plain object if unencrypted legacy format.
+ */
+export function decryptBackupPayload<T = any>(input: any): T {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Invalid backup data format');
+  }
+
+  // If already unencrypted object (legacy backup), return as is
+  if (!input.encrypted) {
+    return input as T;
+  }
+
+  const encSecret = process.env.ENCRYPTION_SECRET;
+  if (!isTest && (!encSecret || encSecret.length < 32)) {
+    throw new Error(
+      'SECURITY ERROR: ENCRYPTION_SECRET is missing or shorter than 32 characters. Cannot decrypt backup.'
+    );
+  }
+
+  const { iv, tag, data } = input;
+  if (!iv || !tag || !data) {
+    throw new Error('Encrypted backup envelope is missing required cryptographic parameters');
+  }
+
+  try {
+    const ivBuf = Buffer.from(iv, 'hex');
+    const authTagBuf = Buffer.from(tag, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, getEncryptionKey(), ivBuf);
+    decipher.setAuthTag(authTagBuf);
+
+    let decrypted = decipher.update(data, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return JSON.parse(decrypted) as T;
+  } catch (error: any) {
+    throw new Error('ถอดรหัสไฟล์สำรองข้อมูลล้มเหลว (Failed to decrypt backup): ตรวจสอบว่า ENCRYPTION_SECRET ตรงกับชุดที่ใช้สร้างไฟล์');
+  }
+}
+
