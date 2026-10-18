@@ -865,9 +865,7 @@
 										</td>
 										<td class="py-2.5 px-4 text-right space-x-2">
 											<a
-												href={item.downloadUrl || item.url}
-												target="_blank"
-												rel="noopener noreferrer"
+												href={`/api/admin/backups/download?pathname=${encodeURIComponent(item.pathname)}&url=${encodeURIComponent(item.url)}`}
 												class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-orange-600 border border-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
 											>
 												<Download class="w-3 h-3" />

@@ -90,12 +90,26 @@ export async function createDatabaseBackup(triggerType: 'CRON' | 'MANUAL' = 'MAN
   const jsonContent = JSON.stringify(backupPayload, null, 2);
   const fileName = `backups/db-backup-${triggerType.toLowerCase()}-${dateStr}.json`;
 
-  // 2. Upload to Vercel Blob
-  const blob = await put(fileName, jsonContent, {
-    access: 'public',
-    contentType: 'application/json',
-    token,
-  });
+  // 2. Upload to Vercel Blob (Private store mode)
+  let blob;
+  try {
+    blob = await put(fileName, jsonContent, {
+      access: 'private',
+      contentType: 'application/json',
+      token,
+    });
+  } catch (err: any) {
+    // If store is configured with public access, retry with public
+    if (err?.message?.includes('Cannot use private access on a public store')) {
+      blob = await put(fileName, jsonContent, {
+        access: 'public',
+        contentType: 'application/json',
+        token,
+      });
+    } else {
+      throw err;
+    }
+  }
 
   return {
     backup: {
