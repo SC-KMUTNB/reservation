@@ -14,7 +14,8 @@
 		X,
 		ExternalLink,
 		UserCheck,
-		Sparkles
+		Sparkles,
+		Database
 	} from 'lucide-svelte';
 	import ClaimUsernameModal from '$lib/components/admin/ClaimUsernameModal.svelte';
 
@@ -118,6 +119,12 @@
 						href: '/admin/users',
 						icon: Users,
 						desc: 'เพิ่ม/แก้ไขสิทธิ์เจ้าหน้าที่'
+					},
+					{
+						label: 'สำรอง & กู้คืนข้อมูล',
+						href: '/admin/backups',
+						icon: Database,
+						desc: 'Vercel Blob & กู้คืนระบบ'
 					},
 					{
 						label: 'ตั้งค่าระบบ & โซเชียล',

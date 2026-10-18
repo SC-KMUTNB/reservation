@@ -12,6 +12,7 @@
     Shield,
     RotateCw,
     Sparkles,
+    Database,
   } from 'lucide-svelte';
   import ViewSwitcherFooter from '$lib/components/mobile/ViewSwitcherFooter.svelte';
   import ClaimUsernameModal from '$lib/components/admin/ClaimUsernameModal.svelte';
@@ -92,6 +93,12 @@
     },
     ...(isSuperAdmin
       ? [
+          {
+            label: 'สำรองข้อมูล',
+            href: '/m/admin/backups',
+            icon: Database,
+            isActive: pathname === '/m/admin/backups',
+          },
           {
             label: 'ตั้งค่า',
             href: '/m/admin/settings',
