@@ -5,7 +5,6 @@
   import {
     type BookingItem,
     type BookingFormData,
-    type SavedRequesterProfile,
     REQUESTER_PROFILE_STORAGE_KEY,
   } from '$lib/types/booking';
   import {
@@ -41,9 +40,6 @@
   let errorMessage = $state<string | null>(null);
   let validationErrors = $state<Record<string, string | undefined>>({});
 
-  let rememberMe = $state(false);
-  let hasSavedProfile = $state(false);
-
   let formData = $state<BookingFormData>({
     date: '',
     startTime: '08:00',
@@ -63,13 +59,7 @@
 
   onMount(() => {
     try {
-      const raw = localStorage.getItem(REQUESTER_PROFILE_STORAGE_KEY);
-      if (raw) {
-        const saved: SavedRequesterProfile = JSON.parse(raw);
-        formData = { ...formData, ...saved };
-        rememberMe = true;
-        hasSavedProfile = true;
-      }
+      localStorage.removeItem(REQUESTER_PROFILE_STORAGE_KEY);
     } catch {}
 
     fetch('/api/settings')
@@ -80,12 +70,6 @@
       })
       .catch(() => {});
   });
-
-  function handleClearSavedProfile() {
-    localStorage.removeItem(REQUESTER_PROFILE_STORAGE_KEY);
-    hasSavedProfile = false;
-    rememberMe = false;
-  }
 
   let currentMonthKey = $derived(
     `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
@@ -191,11 +175,6 @@
         errorMessage = data.error || 'ไม่สามารถส่งคำขอจองได้';
         return;
       }
-      if (rememberMe) {
-        const { fullName, studentId, email, phone, department } = formData;
-        localStorage.setItem(REQUESTER_PROFILE_STORAGE_KEY, JSON.stringify({ fullName, studentId, email, phone, department }));
-        hasSavedProfile = true;
-      }
       isRuleModalOpen = false;
       submittedDetails = payload;
       successBookingCode = data.booking.bookingCode;
@@ -240,15 +219,11 @@
     {todayStr}
     {nowTimeStr}
     {validationErrors}
-    {rememberMe}
-    {hasSavedProfile}
     {isLoading}
     {errorMessage}
     onToggleEquipment={handleToggleEquipment}
     onSelectSlot={(start, end) => (formData = { ...formData, startTime: start, endTime: end })}
     onFormFieldChange={handleFormFieldChange}
-    onToggleRememberMe={(val) => (rememberMe = val)}
-    onClearSavedProfile={handleClearSavedProfile}
     onSubmit={handlePreSubmit}
   />
 

@@ -11,7 +11,6 @@
     LogOut,
     Shield,
     RotateCw,
-    Sparkles,
     Database,
   } from 'lucide-svelte';
   import ViewSwitcherFooter from '$lib/components/mobile/ViewSwitcherFooter.svelte';
@@ -164,16 +163,6 @@
         </div>
 
         <div class="flex items-center space-x-1">
-          <a
-            href="/m/admin/changelog"
-            title="ประวัติการอัปเดตระบบ"
-            class="p-1.5 rounded-xl transition cursor-pointer {pathname === '/m/admin/changelog'
-              ? 'bg-orange-500/20 text-orange-400'
-              : 'text-slate-400 hover:text-orange-400 active:bg-slate-800'}"
-          >
-            <Sparkles class="w-4 h-4" />
-          </a>
-
           <button
             onclick={handleLogout}
             title="ออกจากระบบ"

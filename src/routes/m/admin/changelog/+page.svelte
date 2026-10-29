@@ -1,5 +1,8 @@
 <script lang="ts">
-  import AdminChangelogView from '$lib/components/admin/views/AdminChangelogView.svelte';
-</script>
+  import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
 
-<AdminChangelogView />
+  onMount(() => {
+    goto('/m/admin/dashboard', { replaceState: true });
+  });
+</script>

@@ -23,7 +23,6 @@ A high-performance, modern full-stack meeting room reservation web application b
 - **Public Availability Heatmap:** Real-time calculation of remaining operational hours (08:00 - 20:00) with color bars (*Available all day*, *X hrs free*, *Fully booked*).
 - **Dual-Mode Time Selection:** Reserve rooms using Start/End dropdowns or 2-click interactive slot range selection.
 - **Smart Conflict Prevention:** Automatically prevents double bookings and restricts valid end times dynamically.
-- **Opt-in Profile Memory:** Saves applicant information in `localStorage` for faster subsequent bookings.
 - **Rules Modal:** Requires applicants to review and acknowledge official regulations before booking.
 - **Unique Tracking Code:** Generates standardized tracking codes (e.g., `KMUTNB-2026-0004-9731`).
 
@@ -46,11 +45,10 @@ A high-performance, modern full-stack meeting room reservation web application b
 - **Username Claiming:** Admins can claim a short username to log in without typing their full email address.
 - **Invitation Flow:** Super Admins can invite new admins via email tokens to securely set up their passwords (`/admin/setup-password`).
 
-### 4. Dynamic GitHub Releases Changelog (`/admin/changelog`)
+### 4. Dynamic GitHub Releases & Changelog API (`/api/changelog`)
 - **Dynamic Fetching:** Changelog data is fetched live from GitHub Releases API (`SC-KMUTNB/reservation`) with server-side caching (1 hour) to keep the client bundle lightweight.
 - **Strict SemVer Classification:** Releases are categorized into **Major** (`vX.0.0`), **Minor** (`v1.X.0`), and **Patch** (`v1.X.Y`).
 - **Markdown Parser & Badges:** Automatically maps release notes into structured badges (✨ Features, 🐛 Bug Fixes, ⚡ Improvements, 🛡️ Security).
-- **Admin Force Refresh:** Includes a manual refresh button to bypass cache immediately after publishing.
 
 ### 5. Notifications & Integrations
 - **Google SMTP Email Service:** Sends automated notification emails (booking receipts, approvals, rejections, and admin invites) with `.ics` calendar attachments via Nodemailer.

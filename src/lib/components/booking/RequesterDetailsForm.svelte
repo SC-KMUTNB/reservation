@@ -1,15 +1,11 @@
 <script lang="ts">
-  import { User, Mail, Phone, Hash, Building, FileText, Trash2, AlertTriangle } from 'lucide-svelte';
+  import { User, Mail, Phone, Hash, Building, FileText, AlertTriangle } from 'lucide-svelte';
   import type { BookingFormData } from '$lib/types/booking';
 
   interface Props {
     formData: BookingFormData;
     onChange: (field: keyof BookingFormData, value: string) => void;
     errors: Record<string, string | undefined>;
-    rememberMe: boolean;
-    onToggleRememberMe: (val: boolean) => void;
-    onClearSavedProfile: () => void;
-    hasSavedProfile: boolean;
     onSubmit: (e: SubmitEvent) => void;
     onCancel: () => void;
     isSubmitting: boolean;
@@ -20,10 +16,6 @@
     formData,
     onChange,
     errors,
-    rememberMe,
-    onToggleRememberMe,
-    onClearSavedProfile,
-    hasSavedProfile,
     onSubmit,
     onCancel,
     isSubmitting,
@@ -32,18 +24,9 @@
 </script>
 
 <form onsubmit={onSubmit} class="space-y-4 text-xs">
-  <!-- Header and Prefill Info -->
+  <!-- Header -->
   <div class="flex justify-between items-center pb-2 border-b border-slate-100">
     <h4 class="font-bold text-sm text-slate-800">ข้อมูลผู้ขอใช้บริการ</h4>
-    {#if hasSavedProfile}
-      <button
-        type="button"
-        onclick={onClearSavedProfile}
-        class="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition"
-      >
-        <Trash2 class="w-3 h-3" /> ล้างข้อมูลที่บันทึกไว้ (Clear saved info)
-      </button>
-    {/if}
   </div>
 
   {#if conflictMessage}
@@ -188,20 +171,6 @@
     {/if}
   </div>
 
-  <!-- Opt-in LocalStorage Prefill Checkbox -->
-  <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-    <label class="flex items-center gap-2 cursor-pointer select-none">
-      <input
-        type="checkbox"
-        checked={rememberMe}
-        onchange={(e) => onToggleRememberMe((e.currentTarget as HTMLInputElement).checked)}
-        class="w-4 h-4 text-orange-600 rounded-md border-slate-300 focus:ring-orange-500 cursor-pointer"
-      />
-      <span class="text-xs text-slate-700 font-medium">
-        จดจำข้อมูลผู้จองไว้ในอุปกรณ์นี้สำหรับครั้งถัดไป
-      </span>
-    </label>
-  </div>
 
   <!-- Buttons -->
   <div class="flex justify-end gap-2.5 pt-3 border-t border-slate-100">

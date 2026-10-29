@@ -14,7 +14,6 @@
 		X,
 		ExternalLink,
 		UserCheck,
-		Sparkles,
 		Database
 	} from 'lucide-svelte';
 	import ClaimUsernameModal from '$lib/components/admin/ClaimUsernameModal.svelte';
@@ -105,12 +104,6 @@
 			href: '/admin/profile',
 			icon: UserCheck,
 			desc: 'จัดการบัญชีและเชื่อม Google'
-		},
-		{
-			label: 'บันทึกการอัปเดตระบบ',
-			href: '/admin/changelog',
-			icon: Sparkles,
-			desc: 'ประวัติเวอร์ชัน & การเปลี่ยนแปลง'
 		},
 		...(isSuperAdmin
 			? [

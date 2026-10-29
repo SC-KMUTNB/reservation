@@ -24,12 +24,4 @@ export interface BookingFormData {
   borrowedEquipment?: string[];
 }
 
-export interface SavedRequesterProfile {
-  fullName: string;
-  studentId: string;
-  email: string;
-  phone: string;
-  department: string;
-}
-
 export const REQUESTER_PROFILE_STORAGE_KEY = 'sc_kmutnb_requester_profile_v1';

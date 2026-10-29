@@ -59,10 +59,10 @@ The KMUTNB Meeting Room Reservation System (ระบบจองห้องป
 The system employs a **GitHub-first changelog architecture**. No static JSON/changelog files are bundled in the client application, avoiding file bloat.
 
 ### 3.1 Architecture Overview
-1. The admin UI (`/admin/changelog` and `/m/admin/changelog`) calls `GET /api/changelog`.
+1. Release data is queried via `GET /api/changelog`.
 2. The endpoint queries `https://api.github.com/repos/SC-KMUTNB/reservation/releases`.
 3. The server caches results for **1 hour** (`revalidate: 3600`) with in-memory persistence.
-4. Admins can click **"รีเฟรชข้อมูล" (Force Refresh)** which issues `GET /api/changelog?force=true` to bust the cache immediately.
+4. Calling `GET /api/changelog?force=true` busts the cache immediately.
 
 ### 3.2 Semantic Versioning (SemVer) Rules
 Releases must strictly adhere to Semantic Versioning:

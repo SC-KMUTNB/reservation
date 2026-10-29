@@ -17,15 +17,11 @@
     todayStr: string;
     nowTimeStr: string;
     validationErrors: Record<string, string | undefined>;
-    rememberMe: boolean;
-    hasSavedProfile: boolean;
     isLoading: boolean;
     errorMessage: string | null;
     onToggleEquipment: (id: string) => void;
     onSelectSlot: (start: string, end: string) => void;
     onFormFieldChange: (field: keyof BookingFormData, value: string) => void;
-    onToggleRememberMe: (val: boolean) => void;
-    onClearSavedProfile: () => void;
     onSubmit: (e: SubmitEvent) => void;
   }
 
@@ -40,15 +36,11 @@
     todayStr,
     nowTimeStr,
     validationErrors,
-    rememberMe,
-    hasSavedProfile,
     isLoading,
     errorMessage,
     onToggleEquipment,
     onSelectSlot,
     onFormFieldChange,
-    onToggleRememberMe,
-    onClearSavedProfile,
     onSubmit,
   }: Props = $props();
 </script>
@@ -95,10 +87,6 @@
           {formData}
           onChange={onFormFieldChange}
           errors={validationErrors}
-          {rememberMe}
-          {onToggleRememberMe}
-          {onClearSavedProfile}
-          {hasSavedProfile}
           {onSubmit}
           onCancel={onClose}
           isSubmitting={isLoading}
