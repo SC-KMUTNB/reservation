@@ -68,6 +68,13 @@
   let isCancelling = $state(false);
   let cancelError = $state<string | null>(null);
 
+  // Student ID Verification Modal State
+  let showVerifyModal = $state(false);
+  let pendingVerifyQuery = $state('');
+  let verifyPhoneLast4 = $state('');
+  let isVerifying = $state(false);
+  let verifyError = $state<string | null>(null);
+
   onMount(() => {
     const q = page.url.searchParams.get('q') || '';
     if (q) {
@@ -84,14 +91,28 @@
       .catch(() => {});
   });
 
-  async function handleSearch(searchTerm: string) {
-    if (!searchTerm.trim()) return;
+  async function handleSearch(searchTerm: string, phoneLast4Param?: string) {
+    const trimmed = searchTerm.trim();
+    if (!trimmed) return;
     isLoading = true;
-    searched = true;
     try {
-      const res = await fetch(`/api/bookings/track?q=${encodeURIComponent(searchTerm.trim())}`);
+      let url = `/api/bookings/track?q=${encodeURIComponent(trimmed)}`;
+      if (phoneLast4Param) {
+        url += `&phoneLast4=${encodeURIComponent(phoneLast4Param.trim())}`;
+      }
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.requiresVerification) {
+        pendingVerifyQuery = trimmed;
+        verifyPhoneLast4 = '';
+        verifyError = null;
+        showVerifyModal = true;
+        return;
+      }
+
+      searched = true;
       if (res.ok) {
-        const data = await res.json();
         const list = data.bookings || [];
         results = list;
         generateAllQrs(list);
@@ -100,9 +121,51 @@
       }
     } catch (e) {
       console.error(e);
+      searched = true;
       results = [];
     } finally {
       isLoading = false;
+    }
+  }
+
+  function handleCloseVerifyModal() {
+    showVerifyModal = false;
+    pendingVerifyQuery = '';
+    verifyPhoneLast4 = '';
+    verifyError = null;
+  }
+
+  async function handleConfirmVerify(e: SubmitEvent) {
+    e.preventDefault();
+    const cleanLast4 = verifyPhoneLast4.trim().replace(/[-\s]/g, '');
+    if (!cleanLast4 || !/^\d{4}$/.test(cleanLast4)) {
+      verifyError = 'กรุณาระบุเลขเบอร์โทรศัพท์ 4 ตัวท้ายให้ถูกต้อง (ตัวเลข 4 หลัก)';
+      return;
+    }
+
+    isVerifying = true;
+    verifyError = null;
+
+    try {
+      const url = `/api/bookings/track?q=${encodeURIComponent(pendingVerifyQuery)}&phoneLast4=${encodeURIComponent(cleanLast4)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok) {
+        verifyError = data.error || 'เบอร์โทรศัพท์ 4 ตัวท้ายไม่ตรงกับข้อมูลในระบบ';
+        return;
+      }
+
+      showVerifyModal = false;
+      searched = true;
+      const list = data.bookings || [];
+      results = list;
+      generateAllQrs(list);
+    } catch (err) {
+      console.error(err);
+      verifyError = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+    } finally {
+      isVerifying = false;
     }
   }
 
@@ -143,7 +206,7 @@
   function handleOpenCancelModal(booking: BookingTrackItem) {
     cancellingBooking = booking;
     cancelStudentId = booking.studentId || (query.match(/^\d{13}$/) ? query : '');
-    cancelPhoneLast4 = '';
+    cancelPhoneLast4 = verifyPhoneLast4 || '';
     cancelReason = '';
     cancelError = null;
   }
@@ -593,6 +656,73 @@
             class="flex-1 text-xs"
           >
             {isCancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิกการจอง'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Student ID Phone Verification Modal -->
+  {#if showVerifyModal}
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain">
+      <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-slate-800 my-auto max-h-[calc(100dvh-1.5rem)] flex flex-col">
+        <div class="overflow-y-auto flex-1 pr-1 -mr-1">
+          <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-warm-xs">
+            <ShieldCheck class="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <h3 class="text-lg font-bold text-slate-900 text-center mb-1">
+            ยืนยันตัวตนเพื่อดูข้อมูลการจอง
+          </h3>
+          <p class="text-xs text-slate-500 text-center mb-4 leading-relaxed">
+            เพื่อความปลอดภัยของข้อมูลส่วนบุคคล กรุณากรอกเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้ในการจองสำหรับรหัสนักศึกษา <span class="font-mono font-bold text-orange-600">{pendingVerifyQuery}</span>
+          </p>
+
+          {#if verifyError}
+            <div class="mb-4 bg-rose-50 border border-rose-300 text-rose-700 text-xs p-3 rounded-xl flex items-start gap-2">
+              <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{verifyError}</span>
+            </div>
+          {/if}
+
+          <form id="verify-student-form" onsubmit={handleConfirmVerify} class="space-y-3.5 text-xs">
+            <div>
+              <label for="verify-phone-last4" class="block font-semibold text-slate-700 mb-1">
+                เบอร์โทรศัพท์ 4 ตัวท้ายของผู้จอง
+              </label>
+              <input
+                id="verify-phone-last4"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength={4}
+                required
+                bind:value={verifyPhoneLast4}
+                placeholder="เช่น 5678"
+                class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-center text-lg tracking-widest font-mono font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              />
+              <p class="text-[11px] text-slate-400 mt-1.5 text-center">
+                ระบบจะตรวจสอบความถูกต้องของเบอร์โทรศัพท์ก่อนแสดงรายการจอง
+              </p>
+            </div>
+          </form>
+        </div>
+
+        <div class="flex gap-2.5 pt-3 border-t border-slate-100 shrink-0 mt-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onclick={handleCloseVerifyModal}
+            class="flex-1 text-xs"
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            type="submit"
+            form="verify-student-form"
+            disabled={isVerifying || !verifyPhoneLast4.trim()}
+            class="flex-1 text-xs"
+          >
+            {isVerifying ? 'กำลังตรวจสอบ...' : 'ยืนยันและดูข้อมูล'}
           </Button>
         </div>
       </div>

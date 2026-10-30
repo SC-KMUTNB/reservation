@@ -16,6 +16,7 @@ export async function GET(event: RequestEvent) {
 		}
 
 		const query = event.url.searchParams.get('q')?.trim();
+		const phoneLast4 = event.url.searchParams.get('phoneLast4')?.trim();
 
 		if (!query) {
 			return json(
@@ -24,12 +25,72 @@ export async function GET(event: RequestEvent) {
 			);
 		}
 
+		const isStudentId = /^\d{13}$/.test(query);
+
+		if (isStudentId) {
+			if (!phoneLast4) {
+				return json({
+					requiresVerification: true,
+					message: 'กรุณาระบุเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้ในการจองเพื่อยืนยันตัวตน'
+				});
+			}
+
+			const cleanPhoneLast4 = phoneLast4.replace(/[-\s]/g, '');
+			if (!/^\d{4}$/.test(cleanPhoneLast4)) {
+				return json(
+					{ error: 'เบอร์โทรศัพท์ 4 ตัวท้ายต้องเป็นตัวเลข 4 หลัก' },
+					{ status: 400 }
+				);
+			}
+
+			const bookings = await prisma.booking.findMany({
+				where: {
+					studentId: { equals: query, mode: 'insensitive' }
+				},
+				orderBy: { createdAt: 'desc' },
+				select: {
+					id: true,
+					bookingCode: true,
+					date: true,
+					startTime: true,
+					endTime: true,
+					fullName: true,
+					studentId: true,
+					phone: true,
+					department: true,
+					reason: true,
+					status: true,
+					rejectionReason: true,
+					approvedAt: true,
+					checkedInAt: true,
+					createdAt: true
+				}
+			});
+
+			if (bookings.length === 0) {
+				return json({ bookings: [] });
+			}
+
+			const matchingBookings = bookings.filter((b) => {
+				const cleanPhone = (b.phone || '').replace(/[-\s]/g, '');
+				return cleanPhone.endsWith(cleanPhoneLast4);
+			});
+
+			if (matchingBookings.length === 0) {
+				return json(
+					{ error: 'เบอร์โทรศัพท์ 4 ตัวท้ายไม่ตรงกับข้อมูลในระบบ' },
+					{ status: 400 }
+				);
+			}
+
+			// Sanitize: strip phone before returning for PDPA data minimization
+			const sanitizedBookings = matchingBookings.map(({ phone, ...rest }) => rest);
+			return json({ bookings: sanitizedBookings });
+		}
+
 		const bookings = await prisma.booking.findMany({
 			where: {
-				OR: [
-					{ studentId: { equals: query, mode: 'insensitive' } },
-					{ bookingCode: { equals: query, mode: 'insensitive' } }
-				]
+				bookingCode: { equals: query, mode: 'insensitive' }
 			},
 			orderBy: { createdAt: 'desc' },
 			select: {
