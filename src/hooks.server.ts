@@ -19,6 +19,36 @@ async function verifyAdminToken(token?: string | null) {
 	}
 }
 
+export function applySecurityHeaders(response: Response): Response {
+	// OWASP Hardening Headers
+	response.headers.set('X-Frame-Options', 'DENY');
+	response.headers.set('X-Content-Type-Options', 'nosniff');
+	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+
+	if (process.env.NODE_ENV === 'production') {
+		response.headers.set(
+			'Strict-Transport-Security',
+			'max-age=31536000; includeSubDomains; preload'
+		);
+	}
+
+	// Balanced CSP
+	const csp = [
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"font-src 'self' https://fonts.gstatic.com data:",
+		"img-src 'self' data: blob: https:",
+		"connect-src 'self' https://accounts.google.com https://api.github.com",
+		"frame-ancestors 'none'"
+	].join('; ');
+
+	response.headers.set('Content-Security-Policy', csp);
+
+	return response;
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname, searchParams } = event.url;
 
@@ -36,7 +66,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		pathname.startsWith('/favicon') ||
 		pathname.includes('.')
 	) {
-		return resolve(event);
+		const response = await resolve(event);
+		return applySecurityHeaders(response);
 	}
 
 	// --- Admin Route Protection ---
@@ -118,5 +149,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(307, targetUrl.toString());
 	}
 
-	return resolve(event);
+	const response = await resolve(event);
+	return applySecurityHeaders(response);
 };
