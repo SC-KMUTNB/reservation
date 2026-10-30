@@ -1,6 +1,6 @@
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
-import { checkRateLimit, getClientIp, rateLimitResponse } from '$lib/rate-limit';
+import { checkRateLimit, getSafeClientIp, rateLimitResponse } from '$lib/rate-limit';
 import { recordAuditLog } from '$lib/audit';
 import { notifyUserBookingStatusUpdate } from '$lib/email';
 import { syncBookingToGoogleSheet } from '$lib/google-sheets';
@@ -9,7 +9,7 @@ import { dispatchWebhookEvent } from '$lib/webhook-notify';
 
 export async function GET(event: RequestEvent) {
 	try {
-		const ip = getClientIp(event.request as any);
+		const ip = getSafeClientIp(event);
 		const limitResult = checkRateLimit(`track:${ip}`, 30, 5 * 60 * 1000);
 		if (!limitResult.allowed) {
 			return rateLimitResponse(limitResult);
@@ -59,7 +59,10 @@ export async function GET(event: RequestEvent) {
 
 export async function PATCH(event: RequestEvent) {
 	try {
-		const ip = getClientIp(event.request as any);
+		const ip = getSafeClientIp(event);
+		const limitResult = checkRateLimit(`cancel-ip:${ip}`, 10, 15 * 60 * 1000);
+		if (!limitResult.allowed) return rateLimitResponse(limitResult);
+
 		const body = await event.request.json();
 		const { bookingCode, studentId, phoneLast4, cancelReason } = body;
 
@@ -72,6 +75,9 @@ export async function PATCH(event: RequestEvent) {
 				{ status: 400 }
 			);
 		}
+
+		const codeLimit = checkRateLimit(`cancel-code:${String(bookingCode).trim().toUpperCase()}`, 5, 15 * 60 * 1000);
+		if (!codeLimit.allowed) return rateLimitResponse(codeLimit);
 
 		const booking = await prisma.booking.findFirst({
 			where: {

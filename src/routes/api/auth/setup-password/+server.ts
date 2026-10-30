@@ -3,11 +3,18 @@ import { prisma } from '$lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createSessionToken } from '$lib/auth';
 import { recordAuditLog } from '$lib/audit';
+import { checkRateLimit, getSafeClientIp, rateLimitResponse } from '$lib/rate-limit';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{3,20}$/;
 
 export async function GET(event: RequestEvent) {
 	try {
+		const ip = getSafeClientIp(event);
+		const limitResult = checkRateLimit(`setup-password-check:${ip}`, 30, 15 * 60 * 1000);
+		if (!limitResult.allowed) {
+			return rateLimitResponse(limitResult);
+		}
+
 		const token = event.url.searchParams.get('token');
 
 		if (!token) {
@@ -70,6 +77,12 @@ export async function GET(event: RequestEvent) {
 
 export async function POST(event: RequestEvent) {
 	try {
+		const ip = getSafeClientIp(event);
+		const limitResult = checkRateLimit(`setup-password-submit:${ip}`, 5, 15 * 60 * 1000);
+		if (!limitResult.allowed) {
+			return rateLimitResponse(limitResult);
+		}
+
 		const body = await event.request.json();
 		const { token, password, username } = body;
 
@@ -160,11 +173,6 @@ export async function POST(event: RequestEvent) {
 			fullName: updatedUser.fullName,
 			role: updatedUser.role
 		});
-
-		const ip =
-			event.request.headers.get('x-forwarded-for') ||
-			event.request.headers.get('x-real-ip') ||
-			'127.0.0.1';
 
 		await recordAuditLog({
 			action: 'ADMIN_SETUP_PASSWORD',

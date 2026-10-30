@@ -66,19 +66,45 @@ class SlidingWindowRateLimiter {
 
 const limiter = new SlidingWindowRateLimiter();
 
-export function getClientIp(
-  request: Request | { headers: Headers | { get(name: string): string | null } }
+export function getSafeClientIp(
+  requestOrEvent: any
 ): string {
-  const forwarded = request.headers.get('x-forwarded-for');
+  // If SvelteKit RequestEvent with getClientAddress
+  if (typeof requestOrEvent?.getClientAddress === 'function') {
+    try {
+      const addr = requestOrEvent.getClientAddress();
+      if (addr && typeof addr === 'string' && addr.trim()) {
+        return addr.trim();
+      }
+    } catch {}
+  }
+
+  const req = requestOrEvent?.request || requestOrEvent;
+  const headers = req?.headers;
+  if (!headers) return '127.0.0.1';
+
+  // Cloudflare Connecting IP is set directly by Cloudflare edge proxy
+  const cfIp = headers.get?.('cf-connecting-ip');
+  if (cfIp && cfIp.trim()) return cfIp.trim();
+
+  // Vercel / Standard reverse proxy header
+  const realIp = headers.get?.('x-real-ip');
+  if (realIp && realIp.trim()) return realIp.trim();
+
+  const forwarded = headers.get?.('x-forwarded-for');
   if (forwarded) {
-    const first = forwarded.split(',')[0].trim();
-    if (first) return first;
+    const parts = forwarded.split(',').map((p: string) => p.trim()).filter(Boolean);
+    // Take the leftmost hop in standard XFF
+    if (parts.length > 0) return parts[0];
   }
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp && realIp.trim()) {
-    return realIp.trim();
-  }
+
   return '127.0.0.1';
+}
+
+export function getClientIp(
+  requestOrEvent: any
+): string {
+  return getSafeClientIp(requestOrEvent);
 }
 
 export function checkRateLimit(

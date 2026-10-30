@@ -3,21 +3,21 @@ import { prisma } from '$lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createSessionToken } from '$lib/auth';
 import { recordAuditLog } from '$lib/audit';
-import { checkRateLimit, getClientIp, rateLimitResponse } from '$lib/rate-limit';
+import { checkRateLimit, getSafeClientIp, rateLimitResponse } from '$lib/rate-limit';
 
 export async function POST(event: RequestEvent) {
 	try {
-		const ip = getClientIp(event.request as any);
-		const limitResult = checkRateLimit(`login:${ip}`, 5, 15 * 60 * 1000);
-		if (!limitResult.allowed) {
+		const ip = getSafeClientIp(event);
+		const ipLimitResult = checkRateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
+		if (!ipLimitResult.allowed) {
 			await recordAuditLog({
 				action: 'LOGIN_RATE_LIMITED',
-				details: `จำกัดอัตราการเข้าสู่ระบบ: พยายามเข้าสู่ระบบเกิน 5 ครั้งใน 15 นาทีจาก IP ${ip}`,
+				details: `จำกัดอัตราการเข้าสู่ระบบ: พยายามเข้าสู่ระบบเกิน 20 ครั้งใน 15 นาทีจาก IP ${ip}`,
 				actorName: 'ระบบรักษาความปลอดภัย',
 				actorRole: 'SYSTEM',
 				ipAddress: ip
 			});
-			return rateLimitResponse(limitResult);
+			return rateLimitResponse(ipLimitResult);
 		}
 
 		const body = await event.request.json();
@@ -32,6 +32,18 @@ export async function POST(event: RequestEvent) {
 		}
 
 		const cleanTarget = loginTarget.toLowerCase();
+		const targetLimitResult = checkRateLimit(`login:target:${cleanTarget}`, 5, 15 * 60 * 1000);
+		if (!targetLimitResult.allowed) {
+			await recordAuditLog({
+				action: 'LOGIN_RATE_LIMITED',
+				details: `จำกัดอัตราการเข้าสู่ระบบ: พยายามเข้าสู่ระบบบัญชี ${cleanTarget} เกิน 5 ครั้งใน 15 นาทีจาก IP ${ip}`,
+				actorName: 'ระบบรักษาความปลอดภัย',
+				actorRole: 'SYSTEM',
+				ipAddress: ip
+			});
+			return rateLimitResponse(targetLimitResult);
+		}
+
 		const user = await prisma.user.findFirst({
 			where: {
 				OR: [{ email: cleanTarget }, { username: cleanTarget }]
@@ -48,6 +60,14 @@ export async function POST(event: RequestEvent) {
 		});
 
 		if (!user || !user.isActive) {
+			await recordAuditLog({
+				action: 'LOGIN_FAILED',
+				details: `เข้าสู่ระบบไม่สำเร็จ: ไม่พบบัญชีหรือบัญชีถูกระงับ (${cleanTarget})`,
+				actorName: cleanTarget,
+				actorEmail: cleanTarget.includes('@') ? cleanTarget : undefined,
+				actorRole: 'UNKNOWN',
+				ipAddress: ip
+			});
 			return json(
 				{ error: 'ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีถูกระงับ' },
 				{ status: 401 }
@@ -56,6 +76,15 @@ export async function POST(event: RequestEvent) {
 
 		const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 		if (!isPasswordValid) {
+			await recordAuditLog({
+				action: 'LOGIN_FAILED',
+				details: `เข้าสู่ระบบไม่สำเร็จ: รหัสผ่านไม่ถูกต้องสำหรับบัญชี ${user.fullName} (${user.email})`,
+				actorName: user.fullName,
+				actorEmail: user.email,
+				actorRole: user.role,
+				ipAddress: ip,
+				userId: user.id
+			});
 			return json(
 				{ error: 'ชื่อผู้ใช้/อีเมล หรือรหัสผ่านไม่ถูกต้อง' },
 				{ status: 401 }
