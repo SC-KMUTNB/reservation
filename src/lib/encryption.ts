@@ -100,6 +100,7 @@ export function isAllowedDiscordUrl(url: string): boolean {
   try {
     const u = new URL(url);
     return (
+      u.protocol === 'https:' &&
       (u.hostname === 'discord.com' || u.hostname === 'discordapp.com') &&
       u.pathname.startsWith('/api/webhooks/')
     );

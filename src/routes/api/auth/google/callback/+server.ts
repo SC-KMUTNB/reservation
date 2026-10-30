@@ -19,11 +19,20 @@ export async function GET(event: RequestEvent) {
 	const redirectUri = `${origin}/api/auth/google/callback`;
 
 	if (errorParam) {
+		event.cookies.delete('oauth_state', { path: '/' });
 		throw redirect(303, '/admin/login?error=GOOGLE_CANCELLED');
 	}
 
 	if (!code || !stateToken) {
+		event.cookies.delete('oauth_state', { path: '/' });
 		throw redirect(303, '/admin/login?error=INVALID_OAUTH_REQUEST');
+	}
+
+	const cookieState = event.cookies.get('oauth_state');
+	if (!cookieState || cookieState !== stateToken) {
+		console.error('OAuth state mismatch (potential CSRF attack)');
+		event.cookies.delete('oauth_state', { path: '/' });
+		throw redirect(303, '/admin/login?error=INVALID_OAUTH_STATE');
 	}
 
 	let statePayload: any = null;
@@ -191,6 +200,7 @@ export async function GET(event: RequestEvent) {
 			throw error;
 		}
 		console.error('Error handling Google OAuth callback:', error);
+		event.cookies.delete('oauth_state', { path: '/' });
 		const errorTarget =
 			action === 'link'
 				? '/admin/profile?error=SERVER_ERROR'

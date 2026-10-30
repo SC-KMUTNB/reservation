@@ -24,7 +24,7 @@ export async function PATCH(event: RequestEvent) {
 		}
 
 		const body = await event.request.json();
-		const { fullName, username, role, isActive, password } = body;
+		const { fullName, username, role, isActive, password, currentPassword } = body;
 
 		const targetUser = await prisma.user.findUnique({
 			where: { id }
@@ -74,7 +74,28 @@ export async function PATCH(event: RequestEvent) {
 			}
 			updateData.isActive = Boolean(isActive);
 		}
-		if (password && password.trim().length >= 6) {
+		if (password !== undefined && password !== null && password !== '') {
+			if (typeof password !== 'string' || password.trim().length < 6) {
+				return json(
+					{ error: 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร' },
+					{ status: 400 }
+				);
+			}
+
+			if (isSelf) {
+				if (
+					!currentPassword ||
+					typeof currentPassword !== 'string' ||
+					!targetUser.passwordHash ||
+					!(await bcrypt.compare(currentPassword, targetUser.passwordHash))
+				) {
+					return json(
+						{ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' },
+						{ status: 400 }
+					);
+				}
+			}
+
 			updateData.passwordHash = await bcrypt.hash(password.trim(), 10);
 		}
 

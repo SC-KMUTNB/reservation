@@ -30,6 +30,7 @@
 
 	let fullNameInput = $state('');
 	let usernameInput = $state('');
+	let currentPasswordInput = $state('');
 	let passwordInput = $state('');
 	let confirmPasswordInput = $state('');
 	let isSavingProfile = $state(false);
@@ -93,6 +94,11 @@
 			return;
 		}
 
+		if (passwordInput && !currentPasswordInput) {
+			actionError = 'กรุณาระบุรหัสผ่านปัจจุบันเพื่อเปลี่ยนรหัสผ่านใหม่';
+			return;
+		}
+
 		if (passwordInput && passwordInput.length < 6) {
 			actionError = 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร';
 			return;
@@ -111,6 +117,7 @@
 			};
 			if (passwordInput.trim()) {
 				payload.password = passwordInput.trim();
+				payload.currentPassword = currentPasswordInput;
 			}
 
 			const res = await fetch(`/api/users/${user.id}`, {
@@ -127,6 +134,7 @@
 			}
 
 			actionSuccess = 'บันทึกข้อมูลโปรไฟล์เรียบร้อยแล้ว';
+			currentPasswordInput = '';
 			passwordInput = '';
 			confirmPasswordInput = '';
 			fetchProfile();
@@ -381,7 +389,18 @@
 					<span>เปลี่ยนรหัสผ่านส่วนตัว (เว้นว่างไว้หากไม่ต้องการเปลี่ยน)</span>
 				</div>
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					<div>
+						<label class="block text-xs font-medium text-slate-600 mb-1" for="profile-current-password">รหัสผ่านปัจจุบัน</label>
+						<input
+							id="profile-current-password"
+							type="password"
+							bind:value={currentPasswordInput}
+							placeholder="รหัสผ่านปัจจุบัน"
+							class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:bg-white font-mono"
+						/>
+					</div>
+
 					<div>
 						<label class="block text-xs font-medium text-slate-600 mb-1" for="profile-password">รหัสผ่านใหม่</label>
 						<input

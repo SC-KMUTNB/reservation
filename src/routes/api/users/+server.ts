@@ -35,7 +35,15 @@ export async function GET(event: RequestEvent) {
 			}
 		});
 
-		return json({ users });
+		const sanitizedUsers = users.map((u) => {
+			const { inviteToken, ...rest } = u;
+			return {
+				...rest,
+				hasPendingInvite: Boolean(inviteToken)
+			};
+		});
+
+		return json({ users: sanitizedUsers });
 	} catch (error) {
 		console.error('Error fetching users:', error);
 		return json(
@@ -126,6 +134,12 @@ export async function POST(event: RequestEvent) {
 			event.request.headers.get('x-real-ip') ||
 			'127.0.0.1';
 
+		const { inviteToken: rawToken, ...userWithoutToken } = newUser;
+		const sanitizedNewUser = {
+			...userWithoutToken,
+			hasPendingInvite: Boolean(rawToken)
+		};
+
 		if (isInvite && inviteToken) {
 			try {
 				await sendAdminInviteEmail({
@@ -153,7 +167,7 @@ export async function POST(event: RequestEvent) {
 				success: true,
 				invited: true,
 				message: `สร้างบัญชีและส่งอีเมลคำเชิญไปยัง ${newUser.email} เรียบร้อยแล้ว`,
-				user: newUser
+				user: sanitizedNewUser
 			});
 		}
 
@@ -171,7 +185,7 @@ export async function POST(event: RequestEvent) {
 			success: true,
 			invited: false,
 			message: `สร้างบัญชีผู้ใช้ ${newUser.fullName} เรียบร้อยแล้ว`,
-			user: newUser
+			user: sanitizedNewUser
 		});
 	} catch (error) {
 		console.error('Error creating user:', error);

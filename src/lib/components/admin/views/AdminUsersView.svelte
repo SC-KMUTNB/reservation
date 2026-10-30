@@ -23,6 +23,7 @@
     role: 'SUPER_ADMIN' | 'ADMIN';
     isActive: boolean;
     inviteToken?: string | null;
+    hasPendingInvite?: boolean;
     inviteExpiresAt?: string | null;
     createdAt: string;
     _count?: {
@@ -325,7 +326,7 @@
                 </td>
 
                 <td class="p-3.5">
-                  {#if u.inviteToken}
+                  {#if u.hasPendingInvite || u.inviteToken}
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
                       <Clock class="w-3 h-3 text-amber-600" /> รอตั้งรหัสผ่าน
                     </span>
@@ -346,7 +347,7 @@
 
                 <td class="p-3.5 text-right whitespace-nowrap">
                   <div class="flex items-center justify-end gap-1.5">
-                    {#if u.inviteToken}
+                    {#if u.hasPendingInvite || u.inviteToken}
                       <button
                         type="button"
                         onclick={() => handleResendInvite(u.id, u.email)}
