@@ -8,7 +8,7 @@ export async function GET(event: RequestEvent) {
 		const authHeader = event.request.headers.get('authorization');
 		const cronSecret = process.env.CRON_SECRET;
 
-		if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+		if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
 			return json({ error: 'Unauthorized: invalid cron authorization' }, { status: 401 });
 		}
 

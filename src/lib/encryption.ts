@@ -92,6 +92,23 @@ export function maskSecret(value?: string | null): string {
 }
 
 /**
+ * Validate that a Discord webhook URL points strictly to official Discord webhook endpoints.
+ * Blocks SSRF and non-Discord targets.
+ */
+export function isAllowedDiscordUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === 'discord.com' || u.hostname === 'discordapp.com') &&
+      u.pathname.startsWith('/api/webhooks/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * List of setting keys that must be encrypted at rest in the database.
  */
 export const SENSITIVE_SETTING_KEYS = [
@@ -100,6 +117,28 @@ export const SENSITIVE_SETTING_KEYS = [
   'webhook_discord_url',
   'webhook_line_token',
   'webhook_line_target_id',
+];
+
+/**
+ * List of setting keys that are safe to expose publicly to unauthenticated users.
+ */
+export const PUBLIC_SETTING_KEYS = [
+  'site_title',
+  'site_subtitle',
+  'timezone',
+  'hero_title',
+  'hero_description',
+  'rules_content',
+  'contact_email',
+  'contact_phone',
+  'complaint_url',
+  'social_facebook',
+  'social_facebook_title',
+  'social_instagram',
+  'social_instagram_title',
+  'social_tiktok',
+  'social_tiktok_title',
+  'app_base_url',
 ];
 
 export interface EncryptedBackupEnvelope {

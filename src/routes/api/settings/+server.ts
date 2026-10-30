@@ -4,8 +4,10 @@ import { getSessionFromRequest } from '$lib/auth';
 import { recordAuditLog } from '$lib/audit';
 import {
 	encryptSecret,
-	decryptSecret,
-	SENSITIVE_SETTING_KEYS
+	maskSecret,
+	SENSITIVE_SETTING_KEYS,
+	PUBLIC_SETTING_KEYS,
+	isAllowedDiscordUrl
 } from '$lib/encryption';
 import { getFacilityConfig, saveFacilityConfig } from '$lib/facility-config';
 
@@ -13,6 +15,29 @@ export async function GET(event: RequestEvent) {
 	try {
 		const session = await getSessionFromRequest(event);
 		const isSuperAdmin = session?.role === 'SUPER_ADMIN';
+
+		const facilityConfig = await getFacilityConfig();
+
+		if (!session) {
+			const settings = await prisma.siteSetting.findMany({
+				where: {
+					key: {
+						in: PUBLIC_SETTING_KEYS
+					}
+				}
+			});
+
+			const publicSettingsMap: Record<string, string> = {};
+			for (const s of settings) {
+				publicSettingsMap[s.key] = s.value;
+			}
+
+			return json({
+				settings: publicSettingsMap,
+				isSuperAdmin: false,
+				facilityConfig
+			});
+		}
 
 		const settings = await prisma.siteSetting.findMany({
 			where: {
@@ -29,14 +54,16 @@ export async function GET(event: RequestEvent) {
 			}
 			if (SENSITIVE_SETTING_KEYS.includes(s.key)) {
 				if (isSuperAdmin) {
-					settingsMap[s.key] = s.value ? decryptSecret(s.value) : '';
+					settingsMap[s.key] = s.value ? maskSecret(s.value) : '';
 				}
-			} else {
+			} else if (isSuperAdmin) {
 				settingsMap[s.key] = s.value;
+			} else {
+				if (PUBLIC_SETTING_KEYS.includes(s.key)) {
+					settingsMap[s.key] = s.value;
+				}
 			}
 		}
-
-		const facilityConfig = await getFacilityConfig();
 
 		return json({ settings: settingsMap, isSuperAdmin, facilityConfig });
 	} catch (error) {
@@ -57,6 +84,19 @@ export async function PUT(event: RequestEvent) {
 
 		const body = await event.request.json();
 		const { settings, facilityConfig } = body;
+
+		if (settings && typeof settings === 'object' && 'webhook_discord_url' in settings) {
+			const rawDiscord = String(settings.webhook_discord_url ?? '').trim();
+			if (rawDiscord && !rawDiscord.startsWith('••') && !isAllowedDiscordUrl(rawDiscord)) {
+				return json(
+					{
+						error:
+							'URL ของ Discord Webhook ไม่ถูกต้อง ต้องขึ้นต้นด้วย https://discord.com/api/webhooks/ หรือ https://discordapp.com/api/webhooks/'
+					},
+					{ status: 400 }
+				);
+			}
+		}
 
 		let savedFacilityConfig = null;
 		if (facilityConfig && typeof facilityConfig === 'object') {
