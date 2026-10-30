@@ -1,5 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, spyOn } from 'bun:test';
 import { isBackdated } from '@/lib/date-utils';
+import { GET } from '@/routes/api/bookings/+server';
+import * as authModule from '$lib/auth';
+import { prisma } from '$lib/prisma';
 
 describe('Booking API validation logic', () => {
   const fixedNow = new Date('2026-10-05T14:30:00+07:00'); // 14:30 Bangkok time
@@ -142,5 +145,159 @@ describe('Shared Booking Input Validation (validateBookingInput)', () => {
     expect(res.errors.fullName).toBeDefined();
     expect(res.errors.department).toBeDefined();
     expect(res.errors.reason).toBeDefined();
+  });
+});
+
+describe('Public Calendar Data Minimization & Privacy Protection', () => {
+  test('GET /api/bookings for public users returns strictly date, startTime, endTime, status without PII', async () => {
+    // Test that sanitized mapper strips id, bookingCode, fullName, department
+    const sampleBookings = [
+      {
+        id: 'cuid-123',
+        bookingCode: 'KMUTNB-2026-0001-1234',
+        date: '2026-11-01',
+        startTime: '09:00',
+        endTime: '11:00',
+        status: 'APPROVED',
+        fullName: 'สมชาย รักเรียน',
+        studentId: '6501012345678',
+        department: 'วิศวกรรมคอมพิวเตอร์',
+        phone: '0812345678',
+        email: 'somchai@email.kmutnb.ac.th'
+      }
+    ];
+
+    // Emulate sanitization logic
+    const sanitized = sampleBookings.map((b) => ({
+      date: b.date,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      status: b.status
+    }));
+
+    expect(sanitized[0]).toEqual({
+      date: '2026-11-01',
+      startTime: '09:00',
+      endTime: '11:00',
+      status: 'APPROVED'
+    });
+    expect((sanitized[0] as any).fullName).toBeUndefined();
+    expect((sanitized[0] as any).bookingCode).toBeUndefined();
+    expect((sanitized[0] as any).studentId).toBeUndefined();
+    expect((sanitized[0] as any).id).toBeUndefined();
+    expect((sanitized[0] as any).department).toBeUndefined();
+  });
+
+  test('GET /api/bookings route handler strips PII for unauthenticated callers', async () => {
+    spyOn(authModule, 'getSessionFromRequest').mockResolvedValue(null);
+    (prisma as any).booking = {
+      findMany: async () => [
+        {
+          id: 'cuid-booking-999',
+          bookingCode: 'KMUTNB-2026-0099-5555',
+          date: '2026-11-05',
+          startTime: '10:00',
+          endTime: '12:00',
+          status: 'APPROVED',
+          fullName: 'นายทดสอบ ระบบดี',
+          studentId: '6501019999999',
+          department: 'วิทยาการคอมพิวเตอร์',
+          phone: '0899999999',
+          email: 'test@kmutnb.ac.th',
+          reason: 'จัดกิจกรรมนักศึกษา',
+          rejectionReason: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          approvedById: null,
+          approvedBy: null
+        }
+      ]
+    };
+
+    const mockEvent = {
+      url: new URL('http://localhost:3000/api/bookings?month=2026-11'),
+      request: new Request('http://localhost:3000/api/bookings?month=2026-11'),
+      cookies: { get: () => undefined, set: () => {}, delete: () => {} },
+      locals: {}
+    } as any;
+
+    const response = await GET(mockEvent);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.bookings).toHaveLength(1);
+    const booking = data.bookings[0];
+
+    // Must strictly contain only public calendar fields
+    expect(booking).toEqual({
+      date: '2026-11-05',
+      startTime: '10:00',
+      endTime: '12:00',
+      status: 'APPROVED'
+    });
+
+    // PII & internal identifiers must be stripped
+    expect(booking.fullName).toBeUndefined();
+    expect(booking.bookingCode).toBeUndefined();
+    expect(booking.studentId).toBeUndefined();
+    expect(booking.department).toBeUndefined();
+    expect(booking.id).toBeUndefined();
+    expect(booking.phone).toBeUndefined();
+    expect(booking.email).toBeUndefined();
+    expect(booking.reason).toBeUndefined();
+  });
+
+  test('GET /api/bookings route handler returns full booking details for authenticated admin', async () => {
+    spyOn(authModule, 'getSessionFromRequest').mockResolvedValue({
+      id: 'admin-user-1',
+      email: 'admin@kmutnb.ac.th',
+      fullName: 'เจ้าหน้าที่ผู้ดูแลระบบ',
+      role: 'ADMIN'
+    } as any);
+
+    const fullBookingRecord = {
+      id: 'cuid-booking-999',
+      bookingCode: 'KMUTNB-2026-0099-5555',
+      date: '2026-11-05',
+      startTime: '10:00',
+      endTime: '12:00',
+      status: 'APPROVED',
+      fullName: 'นายทดสอบ ระบบดี',
+      studentId: '6501019999999',
+      department: 'วิทยาการคอมพิวเตอร์',
+      phone: '0899999999',
+      email: 'test@kmutnb.ac.th',
+      reason: 'จัดกิจกรรมนักศึกษา',
+      rejectionReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      approvedById: null,
+      approvedBy: null
+    };
+
+    (prisma as any).booking = {
+      findMany: async () => [fullBookingRecord]
+    };
+
+    const mockEvent = {
+      url: new URL('http://localhost:3000/api/bookings?month=2026-11'),
+      request: new Request('http://localhost:3000/api/bookings?month=2026-11'),
+      cookies: { get: () => undefined, set: () => {}, delete: () => {} },
+      locals: {}
+    } as any;
+
+    const response = await GET(mockEvent);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+
+    expect(data.bookings).toHaveLength(1);
+    const booking = data.bookings[0];
+
+    // Admin should see full details
+    expect(booking.id).toBe('cuid-booking-999');
+    expect(booking.bookingCode).toBe('KMUTNB-2026-0099-5555');
+    expect(booking.fullName).toBe('นายทดสอบ ระบบดี');
+    expect(booking.department).toBe('วิทยาการคอมพิวเตอร์');
+    expect(booking.studentId).toBe('6501019999999');
   });
 });

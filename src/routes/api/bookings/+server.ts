@@ -57,14 +57,10 @@ export async function GET(event: RequestEvent) {
 
 		if (!isAdmin) {
 			const sanitized = bookings.map((b) => ({
-				id: b.id,
-				bookingCode: b.bookingCode,
 				date: b.date,
 				startTime: b.startTime,
 				endTime: b.endTime,
-				status: b.status,
-				department: b.department,
-				fullName: b.fullName
+				status: b.status
 			}));
 			return json({ bookings: sanitized });
 		}
