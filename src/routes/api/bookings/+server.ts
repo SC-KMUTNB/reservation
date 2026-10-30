@@ -4,7 +4,7 @@ import { getSessionFromRequest } from '$lib/auth';
 import { recordAuditLog } from '$lib/audit';
 import { notifyAdminNewBooking, notifyUserBookingReceived } from '$lib/email';
 import { syncBookingToGoogleSheet } from '$lib/google-sheets';
-import { checkRateLimit, getClientIp, rateLimitResponse } from '$lib/rate-limit';
+import { checkRateLimit, getSafeClientIp, rateLimitResponse } from '$lib/rate-limit';
 import { validateBookingInput } from '$lib/booking-validation';
 import { getFacilityConfig } from '$lib/facility-config';
 import { dispatchWebhookEvent } from '$lib/webhook-notify';
@@ -74,7 +74,7 @@ export async function GET(event: RequestEvent) {
 
 export async function POST(event: RequestEvent) {
 	try {
-		const ip = getClientIp(event.request as any);
+		const ip = getSafeClientIp(event);
 		const limitResult = checkRateLimit(`booking-submit:${ip}`, 5, 10 * 60 * 1000);
 		if (!limitResult.allowed) {
 			return rateLimitResponse(limitResult);

@@ -4,8 +4,9 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits recommended for GCM
 const PREFIX = 'enc:v1:';
 
+const isTest = process.env.NODE_ENV === 'test';
 const isTestOrBuild =
-  process.env.NODE_ENV === 'test' ||
+  isTest ||
   process.env.npm_lifecycle_event === 'build' ||
   process.env.BUILDING === 'true';
 

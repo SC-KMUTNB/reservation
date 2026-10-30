@@ -10,6 +10,7 @@ import {
 	isAllowedDiscordUrl
 } from '$lib/encryption';
 import { getFacilityConfig, saveFacilityConfig } from '$lib/facility-config';
+import { getSafeClientIp } from '$lib/rate-limit';
 
 export async function GET(event: RequestEvent) {
 	try {
@@ -142,10 +143,7 @@ export async function PUT(event: RequestEvent) {
 			}
 		}
 
-		const ip =
-			event.request.headers.get('x-forwarded-for') ||
-			event.request.headers.get('x-real-ip') ||
-			'127.0.0.1';
+		const ip = getSafeClientIp(event);
 
 		await recordAuditLog({
 			action: 'SETTINGS_UPDATED',

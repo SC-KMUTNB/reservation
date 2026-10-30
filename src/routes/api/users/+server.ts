@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { recordAuditLog } from '$lib/audit';
 import crypto from 'crypto';
 import { sendAdminInviteEmail } from '$lib/email';
+import { getSafeClientIp } from '$lib/rate-limit';
 
 export async function GET(event: RequestEvent) {
 	try {
@@ -129,10 +130,7 @@ export async function POST(event: RequestEvent) {
 			}
 		});
 
-		const ip =
-			event.request.headers.get('x-forwarded-for') ||
-			event.request.headers.get('x-real-ip') ||
-			'127.0.0.1';
+		const ip = getSafeClientIp(event);
 
 		const { inviteToken: rawToken, ...userWithoutToken } = newUser;
 		const sanitizedNewUser = {
