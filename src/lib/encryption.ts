@@ -4,9 +4,12 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits recommended for GCM
 const PREFIX = 'enc:v1:';
 
-const isTest = process.env.NODE_ENV === 'test';
+const isTestOrBuild =
+  process.env.NODE_ENV === 'test' ||
+  process.env.npm_lifecycle_event === 'build' ||
+  process.env.BUILDING === 'true';
 
-if (!isTest) {
+if (!isTestOrBuild) {
   const encSecret = process.env.ENCRYPTION_SECRET;
   if (!encSecret || encSecret.length < 32) {
     throw new Error(
@@ -18,7 +21,7 @@ if (!isTest) {
 function getEncryptionKey(): Buffer {
   const secret =
     process.env.ENCRYPTION_SECRET ||
-    (isTest ? 'test-fallback-encryption-secret-key-kmutnb-32chars' : '');
+    (isTestOrBuild ? 'test-fallback-encryption-secret-key-kmutnb-32chars' : '');
   // Use SHA-256 to ensure a solid 32-byte key
   return crypto.createHash('sha256').update(secret).digest();
 }

@@ -1,8 +1,11 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-const isTest = process.env.NODE_ENV === 'test';
+const isTestOrBuild =
+  process.env.NODE_ENV === 'test' ||
+  process.env.npm_lifecycle_event === 'build' ||
+  process.env.BUILDING === 'true';
 
-if (!isTest) {
+if (!isTestOrBuild) {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 32) {
     throw new Error(
@@ -12,7 +15,7 @@ if (!isTest) {
 }
 
 export const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET || (isTest ? 'test-fallback-secret-key-kmutnb-reservation-32chars!' : '')
+  process.env.JWT_SECRET || (isTestOrBuild ? 'test-fallback-secret-key-kmutnb-reservation-32chars!' : '')
 );
 
 export interface SessionUser {
