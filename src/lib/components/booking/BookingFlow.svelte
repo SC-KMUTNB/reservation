@@ -12,13 +12,10 @@
     DEFAULT_FACILITY_CONFIG,
     generateTimeSlots,
   } from '$lib/facility-config';
-  import { validateBookingInput } from '$lib/booking-validation';
 
   import BookingPageHeader from '$lib/components/booking/BookingPageHeader.svelte';
   import BookingCalendarCard from '$lib/components/booking/BookingCalendarCard.svelte';
   import BookingFormModal from '$lib/components/booking/BookingFormModal.svelte';
-  import BookingRulesModal from '$lib/components/booking/BookingRulesModal.svelte';
-  import BookingSuccessModal from '$lib/components/booking/BookingSuccessModal.svelte';
 
   interface Props {
     currentMode?: 'desktop' | 'mobile';
@@ -34,11 +31,7 @@
 
   let selectedDate = $state<string>('');
   let isBookingModalOpen = $state(false);
-  let isRuleModalOpen = $state(false);
-  let successBookingCode = $state<string | null>(null);
-  let submittedDetails = $state<BookingFormData | null>(null);
   let errorMessage = $state<string | null>(null);
-  let validationErrors = $state<Record<string, string | undefined>>({});
 
   let formData = $state<BookingFormData>({
     date: '',
@@ -127,16 +120,12 @@
       startTime: firstAvailable?.start || '',
       endTime: firstAvailable?.end || '',
     };
-    validationErrors = {};
     errorMessage = null;
     isBookingModalOpen = true;
   }
 
   function handleFormFieldChange(field: keyof BookingFormData, value: string) {
     formData = { ...formData, [field]: value };
-    if (validationErrors[field]) {
-      validationErrors = { ...validationErrors, [field]: undefined };
-    }
   }
 
   function handleToggleEquipment(id: string) {
@@ -147,21 +136,7 @@
     };
   }
 
-  function handlePreSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    const result = validateBookingInput({ ...formData, date: selectedDate }, { timezone: settings.timezone });
-    if (!result.isValid) {
-      validationErrors = result.errors;
-      errorMessage = result.firstError || 'กรุณากรอกข้อมูลให้ถูกต้องครบถ้วน';
-      return;
-    }
-    validationErrors = {};
-    errorMessage = null;
-    isBookingModalOpen = false;
-    isRuleModalOpen = true;
-  }
-
-  async function handleFinalConfirm() {
+  async function handleFinalSubmit(): Promise<{ success: boolean; bookingCode?: string; error?: string }> {
     isLoading = true;
     errorMessage = null;
     try {
@@ -173,17 +148,16 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        isRuleModalOpen = false;
-        isBookingModalOpen = true;
-        errorMessage = data.error || 'ไม่สามารถส่งคำขอจองได้';
-        return;
+        const err = data.error || 'ไม่สามารถส่งคำขอจองได้';
+        errorMessage = err;
+        return { success: false, error: err };
       }
-      isRuleModalOpen = false;
-      submittedDetails = payload;
-      successBookingCode = data.booking.bookingCode;
       fetchBookingsForMonth(selectedDate.slice(0, 7) || currentMonthKey);
+      return { success: true, bookingCode: data.booking.bookingCode };
     } catch {
-      errorMessage = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+      const err = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
+      errorMessage = err;
+      return { success: false, error: err };
     } finally {
       isLoading = false;
     }
@@ -221,27 +195,13 @@
     {bookingsOnSelectedDate}
     {todayStr}
     {nowTimeStr}
-    {validationErrors}
     {isLoading}
     {errorMessage}
+    appBaseUrl={settings.app_base_url}
     onToggleEquipment={handleToggleEquipment}
     onSelectSlot={(start, end) => (formData = { ...formData, startTime: start, endTime: end })}
     onFormFieldChange={handleFormFieldChange}
-    onSubmit={handlePreSubmit}
-  />
-
-  <BookingRulesModal
-    isOpen={isRuleModalOpen}
-    rules={facilityConfig.bookingRules || []}
-    onClose={() => { isRuleModalOpen = false; isBookingModalOpen = true; }}
-    onConfirm={handleFinalConfirm}
-    {isLoading}
-  />
-
-  <BookingSuccessModal
-    bookingCode={successBookingCode}
-    bookingDetails={submittedDetails}
-    onClose={() => { successBookingCode = null; submittedDetails = null; }}
+    onFinalSubmit={handleFinalSubmit}
   />
 
   <ViewSwitcherFooter {currentMode} />
