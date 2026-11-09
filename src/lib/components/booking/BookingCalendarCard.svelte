@@ -139,19 +139,27 @@
       {@const hasPending = dayBookings.some((b) => b.status === 'PENDING')}
 
       <div
-        onclick={() => onSelectDate(dateStr)}
+        onclick={() => { if (!isPast) onSelectDate(dateStr); }}
         role="button"
-        tabindex="0"
-        onkeydown={(e) => { if (e.key === 'Enter') onSelectDate(dateStr); }}
-        class="border rounded-2xl p-2.5 md:p-3 h-24 md:h-28 flex flex-col justify-between cursor-pointer transition-all duration-200 group relative active-press {isClosed
-          ? 'bg-rose-50/50 border-rose-200 text-rose-700 hover:border-rose-300'
-          : isPast
-          ? 'bg-slate-100/60 border-slate-200/60 text-slate-400 hover:border-slate-300'
-          : hasApproved
-          ? 'bg-emerald-50/40 border-emerald-300 hover:border-emerald-500 hover:shadow-warm-sm text-slate-800'
-          : hasPending
-          ? 'bg-amber-50/40 border-amber-300 hover:border-amber-500 hover:shadow-warm-sm text-slate-800'
-          : 'bg-white hover:border-orange-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800'} {isSelected ? 'ring-2 ring-orange-500 border-orange-500' : ''}"
+        tabindex={isPast ? -1 : 0}
+        aria-disabled={isPast ? 'true' : 'false'}
+        title={isPast ? 'ไม่สามารถเลือกวันที่ผ่านมาแล้วได้' : undefined}
+        onkeydown={(e) => {
+          if (!isPast && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onSelectDate(dateStr);
+          }
+        }}
+        class="border rounded-2xl p-2.5 md:p-3 h-24 md:h-28 flex flex-col justify-between transition-all duration-200 relative {isPast
+          ? 'bg-slate-100/60 border-slate-200/60 text-slate-400 cursor-not-allowed select-none'
+          : `cursor-pointer group active-press ${isClosed
+            ? 'bg-rose-50/50 border-rose-200 text-rose-700 hover:border-rose-300'
+            : hasApproved
+            ? 'bg-emerald-50/40 border-emerald-300 hover:border-emerald-500 hover:shadow-warm-sm text-slate-800'
+            : hasPending
+            ? 'bg-amber-50/40 border-amber-300 hover:border-amber-500 hover:shadow-warm-sm text-slate-800'
+            : 'bg-white hover:border-orange-500 hover:shadow-warm-sm border-slate-200/90 text-slate-800'}`
+        } {isSelected && !isPast ? 'ring-2 ring-orange-500 border-orange-500' : ''}"
       >
         <div class="flex justify-between items-start">
           <span

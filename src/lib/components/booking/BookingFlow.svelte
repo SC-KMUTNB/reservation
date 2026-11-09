@@ -99,6 +99,9 @@
   );
 
   function handleSelectDate(dateStr: string) {
+    // Passed dates cannot be selected for booking (only today or future dates)
+    if (dateStr < todayStr) return;
+
     selectedDate = dateStr;
     const bookingsForDate = (bookingsByMonth[dateStr.slice(0, 7)] || activeMonthBookings).filter(
       (b) => b.date === dateStr
